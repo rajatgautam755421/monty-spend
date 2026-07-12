@@ -51,8 +51,12 @@
   .muted{color:var(--muted)} .faint{color:var(--faint)}
   .sec-title{font-size:12.5px;font-weight:700;color:var(--faint);letter-spacing:.04em;text-transform:uppercase;
     margin:20px 4px 10px}
-  .tabhead{display:flex;align-items:center;justify-content:space-between;margin:22px 2px 12px}
+  .tabhead{display:flex;align-items:center;justify-content:space-between;margin:22px 2px 12px;gap:10px;flex-wrap:wrap}
   .tabhead h2{font-size:22px;font-weight:800;letter-spacing:-.4px}
+  .hdr-ctrls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .calsw{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px;box-shadow:var(--sh-1)}
+  .calsw .calbtn{border:none;background:transparent;color:var(--muted);font-weight:800;font-size:12px;padding:6px 13px;border-radius:999px;letter-spacing:.03em;cursor:pointer;transition:.15s}
+  .calsw .calbtn.on{background:var(--brand);color:#fff}
 
   /* month picker */
   .month-pick{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);
@@ -219,7 +223,10 @@
   <section id="tab-summary">
     <div class="tabhead">
       <h2>Summary</h2>
-      <div class="month-pick"><button class="chev" id="m-prev">‹</button><select id="month-sel"></select><button class="chev" id="m-next">›</button></div>
+      <div class="hdr-ctrls">
+        <div class="calsw"><button class="calbtn" data-cal="BS">BS</button><button class="calbtn" data-cal="AD">AD</button></div>
+        <div class="month-pick"><button class="chev" id="m-prev">‹</button><select id="month-sel"></select><button class="chev" id="m-next">›</button></div>
+      </div>
     </div>
     <div class="hero">
       <div class="lbl" id="hero-lbl">Your balance</div>
@@ -236,7 +243,10 @@
   <section id="tab-activity" class="hidden">
     <div class="tabhead">
       <h2>Activity</h2>
-      <div class="month-pick"><button class="chev" id="m-prev2">‹</button><select id="month-sel2"></select><button class="chev" id="m-next2">›</button></div>
+      <div class="hdr-ctrls">
+        <div class="calsw"><button class="calbtn" data-cal="BS">BS</button><button class="calbtn" data-cal="AD">AD</button></div>
+        <div class="month-pick"><button class="chev" id="m-prev2">‹</button><select id="month-sel2"></select><button class="chev" id="m-next2">›</button></div>
+      </div>
     </div>
     <div class="card pad" id="act-summary" style="margin-bottom:12px"></div>
     <div class="filterbar">
@@ -313,8 +323,6 @@
 
     <div class="sec-title">Settings</div>
     <div class="card">
-      <div class="prow"><div class="t"><div class="n">Calendar</div><div class="e">Dates in Nepali (BS) or English (AD)</div></div>
-        <div class="seg" id="cal-seg" style="margin:0;padding:3px"><button data-cal="BS">BS</button><button data-cal="AD">AD</button></div></div>
       <div class="prow"><div class="t"><div class="n">Currency</div></div>
         <select class="in" id="currency" style="width:auto;padding:8px 34px 8px 12px"></select></div>
       <div class="prow"><div class="t"><div class="n">Export CSV</div><div class="e">Spreadsheet of all entries</div></div>
@@ -360,7 +368,7 @@
     <div class="frow field"><div><label>Amount</label><input class="in" id="e-amt" type="number" inputmode="decimal" placeholder="0" /></div>
       <div><label>Category</label><select class="in" id="e-cat"></select></div></div>
     <div class="frow field"><div><label>Paid by</label><select class="in" id="e-payer"></select></div>
-      <div><label>Date</label><input class="in" id="e-date" type="date" /></div></div>
+      <div><label>Date</label><input class="in" id="e-date" type="date" /><div class="hint dh" id="e-date-h"></div></div></div>
     <div class="field"><label>Split between <span id="e-hint" class="faint"></span></label>
       <div class="chips" id="e-split"></div></div>
     <button class="btn" id="save-expense">Add expense</button>
@@ -372,7 +380,7 @@
     <div class="frow field"><div><label>Lender (gave)</label><select class="in" id="l-from"></select></div>
       <div><label>Borrower (got)</label><select class="in" id="l-to"></select></div></div>
     <div class="frow field"><div><label>Amount</label><input class="in" id="l-amt" type="number" inputmode="decimal" placeholder="0" /></div>
-      <div><label>Date</label><input class="in" id="l-date" type="date" /></div></div>
+      <div><label>Date</label><input class="in" id="l-date" type="date" /><div class="hint dh" id="l-date-h"></div></div></div>
     <div class="field"><label>Note (optional)</label><input class="in" id="l-note" placeholder="e.g. emergency cash" /></div>
     <button class="btn" id="save-loan" style="background:var(--loan)">Add loan</button>
   </div>
@@ -384,7 +392,7 @@
       <div><label>To (received)</label><select class="in" id="p-to"></select></div></div>
     <div id="pay-qr" class="payqr hidden"></div>
     <div class="frow field"><div><label>Amount</label><input class="in" id="p-amt" type="number" inputmode="decimal" placeholder="0" /></div>
-      <div><label>Date</label><input class="in" id="p-date" type="date" /></div></div>
+      <div><label>Date</label><input class="in" id="p-date" type="date" /><div class="hint dh" id="p-date-h"></div></div></div>
     <div class="field"><label>Note (optional)</label><input class="in" id="p-note" placeholder="e.g. July contribution" /></div>
     <button class="btn" id="save-payment" style="background:var(--pay)">Add payment</button>
   </div>
@@ -398,7 +406,7 @@
   <div class="field"><label>What for?</label><input class="in" id="pe-desc" placeholder="e.g. Coffee, Taxi" /></div>
   <div class="frow field"><div><label>Amount</label><input class="in" id="pe-amt" type="number" inputmode="decimal" placeholder="0" /></div>
     <div><label>Category</label><select class="in" id="pe-cat"></select></div></div>
-  <div class="field"><label>Date</label><input class="in" id="pe-date" type="date" /></div>
+  <div class="field"><label>Date</label><input class="in" id="pe-date" type="date" /><div class="hint dh" id="pe-date-h"></div></div>
   <button class="btn" id="save-personal">Add</button>
 </div>
 
@@ -586,8 +594,16 @@ window.FIREBASE_CONFIG = {
   function setCurrency(c){state.currency=c;saveLocal();renderAll();pushCloud("meta/currency",c);}
 
   /* ===== compute ===== */
-  function monthsList(){return[...new Set(state.txns.map(t=>(t.date||"").slice(0,7)).filter(Boolean))].sort().reverse();}
-  function inScope(arr){return filterMonth==="all"?arr:arr.filter(t=>(t.date||"").slice(0,7)===filterMonth);}
+  function bsYM(dateStr){const p=String(dateStr).slice(0,10).split("-").map(Number);
+    const nd=new window.NepaliDate(new Date(p[0],p[1]-1,p[2],12,0,0));
+    const b=nd.getBS?nd.getBS():{year:nd.getYear(),month:nd.getMonth()};return{y:b.year,m:b.month};}
+  function monthKeyOf(dateStr){if(!dateStr)return"";
+    if(dateMode==="BS"&&window.NepaliDate){try{const o=bsYM(dateStr);return o.y+"-"+String(o.m+1).padStart(2,"0");}catch(e){}}
+    return String(dateStr).slice(0,7);}
+  function monthLabelOf(key){const p=key.split("-");const y=+p[0],m=+p[1];
+    return (dateMode==="BS"?BSMONTHS[m-1]:MONTHS[m-1])+" "+y;}
+  function monthsList(){return[...new Set(state.txns.map(t=>monthKeyOf(t.date)).filter(Boolean))].sort().reverse();}
+  function inScope(arr){return filterMonth==="all"?arr:arr.filter(t=>monthKeyOf(t.date)===filterMonth);}
   function balances(txns){const b={};state.mates.forEach(m=>b[m.id]=0);
     txns.forEach(t=>{if(t.type==="payment"){if(b[t.from]!=null)b[t.from]+=t.amt;if(b[t.to]!=null)b[t.to]-=t.amt;}
       else{const n=(t.split||[]).length;if(!n)return;const sh=t.amt/n;if(b[t.payer]!=null)b[t.payer]+=t.amt;t.split.forEach(id=>{if(b[id]!=null)b[id]-=sh;});}});
@@ -601,7 +617,7 @@ window.FIREBASE_CONFIG = {
   /* ===== month picker ===== */
   function buildMonths(){
     const ms=monthsList();
-    const opts=`<option value="all">All time</option>`+ms.map(m=>`<option value="${m}">${MONTHS[+m.slice(5,7)-1]} ${m.slice(0,4)}</option>`).join("");
+    const opts=`<option value="all">All time</option>`+ms.map(m=>`<option value="${m}">${monthLabelOf(m)}</option>`).join("");
     if(filterMonth!=="all"&&!ms.includes(filterMonth))filterMonth="all";
     ["month-sel","month-sel2"].forEach(id=>{$(id).innerHTML=opts;$(id).value=filterMonth;});
   }
@@ -748,10 +764,9 @@ window.FIREBASE_CONFIG = {
     $("p-name").textContent=currentUser.displayName||"You";
     $("p-email").textContent=currentUser.email||"";
     $("p-av").textContent=initials(currentUser.displayName||currentUser.email);
-    const mine=filterMonth==="all"?personal:personal.filter(e=>(e.date||"").slice(0,7)===filterMonth);
     const items=[...personal].sort((a,b)=>(b.date+b.id).localeCompare(a.date+a.id));
-    const now=new Date().toISOString().slice(0,7);
-    const monthTot=personal.filter(e=>(e.date||"").slice(0,7)===now).reduce((s,e)=>s+e.amt,0);
+    const nowKey=monthKeyOf(new Date().toISOString().slice(0,10));
+    const monthTot=personal.filter(e=>monthKeyOf(e.date)===nowKey).reduce((s,e)=>s+e.amt,0);
     $("p-total").textContent=money0(monthTot);
     const c=$("p-list");
     c.innerHTML=items.length?items.map(e=>`<div class="act"><div class="ic">${catIcon(e.cat)}</div>
@@ -804,10 +819,10 @@ window.FIREBASE_CONFIG = {
     if(k==="expense"){$("e-desc").value=t.desc||"";$("e-amt").value=t.amt;$("e-cat").value=t.cat||"General";fillSel($("e-payer"),t.payer);$("e-date").value=t.date||todayStr();setSplit(t.split||[]);eHint();}
     else if(k==="loan"){fillSel($("l-from"),t.from);fillSel($("l-to"),t.to);$("l-amt").value=t.amt;$("l-date").value=t.date||todayStr();$("l-note").value=(t.desc==="Loan"?"":t.desc)||"";}
     else{fillSel($("p-from"),t.from);fillSel($("p-to"),t.to);$("p-amt").value=t.amt;$("p-date").value=t.date||todayStr();$("p-note").value=t.desc||"";}
-    $("scrim").classList.add("show");$("sheet").classList.add("show");}
+    allDateHints();$("scrim").classList.add("show");$("sheet").classList.add("show");}
   function openSettle(from,to,amt){openSheet();setKind("payment");
     fillSel($("p-from"),from);fillSel($("p-to"),to);$("p-amt").value=Math.round(amt*100)/100;
-    $("p-note").value="Settle up";$("p-date").value=todayStr();renderPayQR();}
+    $("p-note").value="Settle up";$("p-date").value=todayStr();allDateHints();renderPayQR();}
   $("fab").onclick=()=>{if(state.mates.length<2){flash("Add 2+ flatmates first");document.querySelector('.nav a[data-go="group"]').click();return;}openSheet();};
   $("scrim").onclick=closeSheet;
   $("sheet-del").onclick=()=>{if(editingId&&confirm("Delete this entry?")){removeTxn(editingId);closeSheet();flash("Deleted");}};
@@ -825,7 +840,7 @@ window.FIREBASE_CONFIG = {
     sp.innerHTML=state.mates.map(m=>`<div class="chip ${on.includes(m.id)?'on':''}" data-id="${m.id}"><span class="ck">${on.includes(m.id)?'✓':''}</span>${esc(m.name)}</div>`).join("");
     sp.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{c.classList.toggle("on");c.querySelector(".ck").textContent=c.classList.contains("on")?"✓":"";eHint();});
     ["e-date","l-date","p-date"].forEach(id=>{if(!$(id).value)$(id).value=todayStr();});
-    eHint();
+    eHint();allDateHints();
   }
   function eHint(){const n=eSplit().length,a=parseFloat($("e-amt").value);
     $("e-hint").textContent=n?(a>0?`· ${money(a/n)} each`:`· ${n} people`):"· pick people";}
@@ -849,7 +864,7 @@ window.FIREBASE_CONFIG = {
 
   /* ===== personal sheet ===== */
   function openP(){$("pe-cat").innerHTML=CATS.map(c=>`<option value="${c[0]}">${c[1]} ${c[0]}</option>`).join("");
-    if(!$("pe-date").value)$("pe-date").value=todayStr();$("scrim-p").classList.add("show");$("sheet-p").classList.add("show");}
+    if(!$("pe-date").value)$("pe-date").value=todayStr();dateHint("pe-date");$("scrim-p").classList.add("show");$("sheet-p").classList.add("show");}
   function closeP(){$("scrim-p").classList.remove("show");$("sheet-p").classList.remove("show");}
   $("p-add-btn").onclick=openP;$("scrim-p").onclick=closeP;
   $("save-personal").onclick=()=>{const desc=$("pe-desc").value.trim(),amt=parseFloat($("pe-amt").value),
@@ -948,8 +963,13 @@ window.FIREBASE_CONFIG = {
   $("p-to").addEventListener("change",renderPayQR);
   const cur=$("currency");CURRENCIES.forEach(([s,c])=>{const o=document.createElement("option");o.value=s;o.textContent=s+" "+c;cur.appendChild(o);});
   cur.value=state.currency;cur.onchange=()=>setCurrency(cur.value);
-  function paintCal(){document.querySelectorAll("#cal-seg button").forEach(b=>b.classList.toggle("on",b.dataset.cal===dateMode));}
-  document.querySelectorAll("#cal-seg button").forEach(b=>b.onclick=()=>{dateMode=b.dataset.cal;localStorage.setItem("monty.datemode",dateMode);paintCal();renderAll();});
+  function dateHint(id){const el=$(id),h=$(id+"-h");if(!el||!h)return;h.textContent=el.value?"= "+fmtDate(el.value):"";}
+  function allDateHints(){["e-date","l-date","p-date","pe-date"].forEach(dateHint);}
+  ["e-date","l-date","p-date","pe-date"].forEach(id=>{const el=$(id);if(el)el.addEventListener("change",()=>dateHint(id));});
+  function paintCal(){document.querySelectorAll(".calbtn").forEach(b=>b.classList.toggle("on",b.dataset.cal===dateMode));}
+  document.querySelectorAll(".calbtn").forEach(b=>b.onclick=()=>{
+    if(dateMode===b.dataset.cal)return;
+    dateMode=b.dataset.cal;localStorage.setItem("monty.datemode",dateMode);filterMonth="all";paintCal();renderAll();});
   paintCal();
 
   /* ===== share / data ===== */
