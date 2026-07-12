@@ -9,6 +9,10 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%236366f1'/%3E%3Ctext x='50' y='71' font-size='60' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E" />
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="apple-touch-icon" sizes="120x120" href="icons/apple-touch-icon-120.png" />
+<link rel="apple-touch-icon" sizes="152x152" href="icons/apple-touch-icon-152.png" />
+<link rel="apple-touch-icon" sizes="167x167" href="icons/apple-touch-icon-167.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Monty" />
@@ -1084,11 +1088,15 @@ window.FIREBASE_CONFIG = {
   }
   let deferred=null;
   const btn=document.getElementById("install-btn");
-  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;if(btn)btn.classList.remove("hidden");});
+  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone=window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;if(btn){btn.classList.remove("hidden");btn.textContent="📲 Install Monty app";}});
   if(btn)btn.onclick=async()=>{
-    if(!deferred){alert("To install: open the browser menu (⋮) and choose “Install app” / “Add to Home screen”.");return;}
-    deferred.prompt();await deferred.userChoice;deferred=null;btn.classList.add("hidden");
+    if(deferred){deferred.prompt();await deferred.userChoice;deferred=null;btn.classList.add("hidden");return;}
+    if(isIOS){alert("Install Monty on iPhone/iPad:\n\n1. In Safari, tap the Share button ( the □ with ↑ )\n2. Scroll and tap “Add to Home Screen”\n3. Tap Add\n\nMonty opens full-screen with its icon.");return;}
+    alert("To install: open the browser menu (⋮) and choose “Install app” / “Add to Home screen”.");
   };
+  if(isIOS && !standalone && btn){btn.classList.remove("hidden");btn.textContent="📲 Install on iPhone/iPad";}
   window.addEventListener("appinstalled",()=>{if(btn)btn.classList.add("hidden");});
 })();
 </script>
