@@ -463,6 +463,13 @@ window.FIREBASE_CONFIG = {
   const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const CATS=[["General","🧾"],["Groceries","🛒"],["Dining out","🍽️"],["Rent","🏠"],["Utilities","💡"],["Transport","🚕"],["Shopping","🛍️"],["Fun","🎉"],["Health","💊"]];
   const catIcon=c=>{const f=CATS.find(x=>x[0]===c);return f?f[1]:"🧾";};
+  const WDAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  function fmtDate(d){if(!d)return"";const p=String(d).slice(0,10).split("-");if(p.length!==3)return d;
+    const y=+p[0],m=+p[1],day=+p[2];if(!m||!day)return d;
+    const dt=new Date(Date.UTC(y,m-1,day));const today=new Date();const ts=new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()));
+    const diff=Math.round((ts-dt)/86400000);
+    if(diff===0)return"Today";if(diff===1)return"Yesterday";
+    return WDAYS[dt.getUTCDay()]+", "+day+" "+MONTHS[m-1]+" "+y;}
 
   let state=load(), me=localStorage.getItem("monty.me")||"", filterMonth="all";
   let entryKind="expense", editingId=null;
@@ -686,13 +693,13 @@ window.FIREBASE_CONFIG = {
         const f=mateById(t.from),to=mateById(t.to),loan=t.kind==="loan";
         return `<div class="act" data-edit="${t.id}"><div class="ic">${loan?"🤝":"💵"}</div>
           <div class="mid"><div class="n">${first(f&&f.name)} → ${first(to&&to.name)}<span class="pilltag ${loan?'loan':'pay'}">${loan?"LOAN":"PAYMENT"}</span></div>
-          <div class="s">${esc(t.date)}${t.desc?" · "+esc(t.desc):""}</div></div>
+          <div class="s">${esc(fmtDate(t.date))}${t.desc?" · "+esc(t.desc):""}</div></div>
           <div class="right"><div class="a ${loan?'loan':'pay'}">${money0(t.amt)}</div>${delBtn(t.id)}</div></div>`;
       }
       const p=mateById(t.payer),sh=t.amt/(t.split||[]).length;
       return `<div class="act" data-edit="${t.id}"><div class="ic">${catIcon(t.cat)}</div>
         <div class="mid"><div class="n">${esc(t.desc)}</div>
-        <div class="s">${first(p&&p.name)} paid · ${money0(sh)}/person · ${esc(t.date)}</div></div>
+        <div class="s">${first(p&&p.name)} paid · ${money0(sh)}/person · ${esc(fmtDate(t.date))}</div></div>
         <div class="right"><div class="a">${money0(t.amt)}</div>${delBtn(t.id)}</div></div>`;
     }).join("");
     c.querySelectorAll("[data-edit]").forEach(el=>el.onclick=()=>openSheetEdit(el.dataset.edit));
@@ -737,7 +744,7 @@ window.FIREBASE_CONFIG = {
     $("p-total").textContent=money0(monthTot);
     const c=$("p-list");
     c.innerHTML=items.length?items.map(e=>`<div class="act"><div class="ic">${catIcon(e.cat)}</div>
-      <div class="mid"><div class="n">${esc(e.desc)}</div><div class="s">${esc(e.cat||"General")} · ${esc(e.date)}</div></div>
+      <div class="mid"><div class="n">${esc(e.desc)}</div><div class="s">${esc(e.cat||"General")} · ${esc(fmtDate(e.date))}</div></div>
       <div class="right"><div class="a">${money0(e.amt)}</div><div class="del" data-pdel="${e.id}">Delete</div></div></div>`).join("")
       :`<div class="empty"><span class="big">🔒</span>No personal expenses yet.</div>`;
     c.querySelectorAll("[data-pdel]").forEach(b=>b.onclick=()=>{if(personalRef&&confirm("Delete?"))personalRef.child(b.dataset.pdel).remove();});
