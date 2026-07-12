@@ -7,6 +7,12 @@
 <meta name="description" content="Monty — a simple, beautiful shared-expense splitter for flatmates. Split costs, track loans, settle up." />
 <title>Monty · Split & settle with flatmates</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%236366f1'/%3E%3Ctext x='50' y='71' font-size='60' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Monty" />
+<meta name="mobile-web-app-capable" content="yes" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -308,6 +314,7 @@
           <div class="muted" style="font-size:12px" id="sync-sub"></div></div>
       </div>
       <button class="btn" style="margin-top:14px" id="share-btn">📤 Share invite link</button>
+      <button class="btn hidden" style="margin-top:10px;background:var(--pos)" id="install-btn">📲 Install Monty app</button>
     </div>
 
     <div class="sec-title">Flatmates</div>
@@ -1065,6 +1072,23 @@ window.FIREBASE_CONFIG = {
   attachSheetDrag($("sheet-c"),closeContact);
 
   renderAll();initFirebase();
+})();
+</script>
+
+<script>
+/* ===== PWA: service worker + install button ===== */
+(function(){
+  if("serviceWorker" in navigator){
+    window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+  }
+  let deferred=null;
+  const btn=document.getElementById("install-btn");
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;if(btn)btn.classList.remove("hidden");});
+  if(btn)btn.onclick=async()=>{
+    if(!deferred){alert("To install: open the browser menu (⋮) and choose “Install app” / “Add to Home screen”.");return;}
+    deferred.prompt();await deferred.userChoice;deferred=null;btn.classList.add("hidden");
+  };
+  window.addEventListener("appinstalled",()=>{if(btn)btn.classList.add("hidden");});
 })();
 </script>
 </body>
