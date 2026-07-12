@@ -287,11 +287,7 @@
         <div style="flex:1"><div style="font-weight:700;font-size:14px" id="sync-title">Connecting…</div>
           <div class="muted" style="font-size:12px" id="sync-sub"></div></div>
       </div>
-      <div class="frow" style="margin-top:14px">
-        <div><label>Group code</label><input class="in" id="room-input" placeholder="mughal-house" /></div>
-        <div style="flex:0 0 auto;display:flex;align-items:flex-end"><button class="btn sec" style="width:auto;padding:13px 16px" id="join-room">Switch</button></div>
-      </div>
-      <button class="btn" style="margin-top:12px" id="share-btn">📤 Share invite link</button>
+      <button class="btn" style="margin-top:14px" id="share-btn">📤 Share invite link</button>
     </div>
 
     <div class="sec-title">Flatmates</div>
@@ -306,7 +302,8 @@
 
     <div class="sec-title">Rent & other payees</div>
     <div class="card" id="payee-list" style="margin-bottom:10px"></div>
-    <button class="btn sec hidden" id="add-payee-btn">+ Add payee (landlord, etc.)</button>
+    <button class="btn sec hidden" id="add-payee-btn" style="margin-bottom:8px">+ Add payee (landlord, etc.)</button>
+    <button class="btn sec" id="download-qrs">⬇️ Download all eSewa QRs</button>
 
     <div class="sec-title">Settings</div>
     <div class="card">
@@ -461,10 +458,7 @@ window.FIREBASE_CONFIG = {
   const CFG=window.FIREBASE_CONFIG||{};
   let cloudRef=null, personalRef=null, currentUser=null, seeding=false;
 
-  const urlRoom=new URLSearchParams(location.search).get("room");
-  let room=sanitizeRoom(urlRoom||localStorage.getItem("monty.room")||("flat-"+Math.random().toString(36).slice(2,8)));
-  localStorage.setItem("monty.room",room);
-  function sanitizeRoom(s){return String(s).toLowerCase().replace(/[^a-z0-9\-_]/g,"-").replace(/^-+|-+$/g,"").slice(0,40)||"flat";}
+  const room="flatmates"; // single fixed group — switching disabled
 
   function load(){let s=null;try{s=JSON.parse(localStorage.getItem(LS_KEY));}catch(e){}
     if(!s||!Array.isArray(s.mates))return{mates:[],txns:[],currency:"रू",payees:[]};
@@ -709,7 +703,6 @@ window.FIREBASE_CONFIG = {
       removeMate(b.dataset.rm);});
     $("add-mate-card").classList.toggle("hidden",!isOwner());
     $("add-mate-note").classList.toggle("hidden",isOwner());
-    $("room-input").value=room;
   }
 
   /* ===== render personal ===== */
@@ -906,13 +899,25 @@ window.FIREBASE_CONFIG = {
   const cur=$("currency");CURRENCIES.forEach(([s,c])=>{const o=document.createElement("option");o.value=s;o.textContent=s+" "+c;cur.appendChild(o);});
   cur.value=state.currency;cur.onchange=()=>setCurrency(cur.value);
 
-  /* ===== room / share / data ===== */
-  $("join-room").onclick=()=>{const v=sanitizeRoom($("room-input").value);if(!v)return;
-    room=v;localStorage.setItem("monty.room",room);if(cloudRef)connectRoom();renderPeople();flash("Group: "+room);};
-  function inviteLink(){return location.origin+location.pathname+"?room="+encodeURIComponent(room);}
+  /* ===== share / data ===== */
+  function inviteLink(){return location.origin+location.pathname;}
   $("share-btn").onclick=()=>{const link=inviteLink();
     if(navigator.share){navigator.share({title:"Monty",text:"Join our flat expenses",url:link}).catch(()=>{});return;}
     navigator.clipboard.writeText(link).then(()=>flash("Invite link copied ✓"),()=>prompt("Copy link:",link));};
+  $("download-qrs").onclick=async()=>{
+    const all=[...state.mates,...(state.payees||[])].filter(m=>qrSrc(m));
+    if(!all.length)return flash("No QRs saved yet");
+    flash("Downloading "+all.length+" QR"+(all.length>1?"s":"")+"…");
+    for(const m of all){
+      const src=qrSrc(m),name=(m.name||"qr").replace(/[^\w]+/g,"_");
+      try{const blob=await (await fetch(src)).blob();const url=URL.createObjectURL(blob);
+        const a=document.createElement("a");a.href=url;a.download=name+"-eSewa.png";
+        document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
+      }catch(e){const a=document.createElement("a");a.href=src;a.target="_blank";a.download=name+"-eSewa.png";
+        document.body.appendChild(a);a.click();a.remove();}
+      await new Promise(r=>setTimeout(r,500));
+    }
+    flash("QRs downloaded ✓");};
   $("export").onclick=()=>{const b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
     const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="monty-"+room+".json";a.click();};
   $("export-csv").onclick=()=>{
