@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="Monty — a minimal shared-expense splitter for flatmates. Track who paid, split costs, and settle up." />
+<meta name="description" content="Monty — a minimal shared-expense splitter for flatmates. Track who paid, cash transfers, and settle up per month or combined." />
 <title>Monty · Split flatmate expenses</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%236c8cff'/%3E%3Ctext x='50' y='72' font-size='64' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E" />
 <style>
   :root{
     --bg:#0f1115; --panel:#171a21; --panel-2:#1e222b; --line:#2a2f3a;
     --text:#e7eaf0; --muted:#8b93a3; --accent:#6c8cff; --accent-2:#4ade80;
-    --danger:#f87171; --warn:#fbbf24; --radius:14px;
+    --danger:#f87171; --warn:#fbbf24; --pay:#22d3ee; --radius:14px;
     --shadow:0 6px 24px rgba(0,0,0,.35);
   }
   *{box-sizing:border-box}
@@ -40,8 +40,9 @@
 
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
     padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
-  .card h2{margin:0 0 14px;font-size:15px;letter-spacing:.3px;color:var(--text)}
+  .card h2{margin:0 0 14px;font-size:15px;letter-spacing:.3px;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .card h2 span{color:var(--muted);font-weight:500}
+  .card h2 .spacer{flex:1}
 
   label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
   input,select,textarea{width:100%;background:var(--panel-2);color:var(--text);border:1px solid var(--line);
@@ -58,6 +59,16 @@
   .btn.danger:hover{background:rgba(248,113,113,.1)}
   .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}
 
+  .seg{display:inline-flex;gap:5px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:11px;padding:4px;margin-bottom:16px}
+  .seg button{border:none;background:transparent;color:var(--muted);padding:8px 16px;border-radius:8px;
+    font-weight:700;font-size:13px;cursor:pointer;transition:.15s}
+  .seg button.on{background:var(--accent);color:#fff}
+  .seg button.on.pay{background:var(--pay);color:#06222a}
+
+  .mfilter{background:var(--panel-2);color:var(--text);border:1px solid var(--line);
+    border-radius:9px;padding:7px 9px;font-size:12.5px;max-width:190px}
+
   .list{display:flex;flex-direction:column;gap:8px}
   .item{display:flex;align-items:center;gap:12px;background:var(--panel-2);border:1px solid var(--line);
     border-radius:11px;padding:11px 13px}
@@ -67,7 +78,9 @@
   .item .meta .n{font-weight:600;font-size:14px}
   .item .meta .e{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .item .amt{font-weight:700;font-variant-numeric:tabular-nums}
-  .pill{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--line);color:var(--muted)}
+  .pill{font-size:10.5px;padding:2px 8px;border-radius:20px;background:var(--line);color:var(--muted)}
+  .pill.pay{background:rgba(34,211,238,.16);color:var(--pay)}
+  .pill.exp{background:rgba(108,140,255,.16);color:var(--accent)}
 
   .split-grid{display:flex;flex-wrap:wrap;gap:8px}
   .chip{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:20px;
@@ -75,6 +88,7 @@
   .chip.on{border-color:var(--accent);background:rgba(108,140,255,.14);color:var(--text)}
   .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--line)}
   .chip.on .dot{background:var(--accent-2)}
+  .mini{font-size:12px;color:var(--accent);cursor:pointer;user-select:none;margin-left:4px}
 
   .exp{flex-direction:column;align-items:stretch;gap:6px}
   .exp .head{display:flex;align-items:center;gap:10px}
@@ -85,7 +99,7 @@
 
   .settle{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--line);
     border-radius:11px;padding:12px 14px}
-  .settle .arrow{color:var(--muted)}
+  .settle .arrow{color:var(--muted);font-size:12.5px}
   .settle .who{font-weight:600}
   .settle .amt{margin-left:auto;font-weight:800;color:var(--warn);font-variant-numeric:tabular-nums}
   .allsettled{text-align:center;color:var(--accent-2);padding:22px;font-weight:600}
@@ -108,59 +122,91 @@
       <div class="logo">M</div>
       <div>
         <h1>Monty</h1>
-        <p>Shared expenses for flatmates — who paid, who owes.</p>
+        <p>Shared expenses & cash transfers for flatmates.</p>
       </div>
     </div>
     <select class="cur" id="currency" title="Currency"></select>
   </header>
 
   <nav class="tabs">
-    <div class="tab active" data-tab="expenses">Expenses <span class="badge" id="badge-exp">0</span></div>
+    <div class="tab active" data-tab="expenses">Ledger <span class="badge" id="badge-exp">0</span></div>
     <div class="tab" data-tab="balances">Settle up</div>
     <div class="tab" data-tab="mates">Flatmates <span class="badge" id="badge-mates">0</span></div>
   </nav>
 
-  <!-- EXPENSES -->
+  <!-- LEDGER -->
   <section id="tab-expenses">
     <div class="card" id="add-expense-card">
-      <h2>Add an expense</h2>
-      <div id="need-mates" class="empty hidden">Add at least one flatmate first (Flatmates tab).</div>
-      <div id="expense-form">
-        <div class="row">
-          <div style="flex:2">
-            <label>Description</label>
-            <input id="e-desc" placeholder="e.g. Groceries, Electricity bill, Rent" />
-          </div>
-          <div>
-            <label>Amount</label>
-            <input id="e-amt" type="number" min="0" step="0.01" placeholder="0.00" />
-          </div>
+      <h2>Add to ledger</h2>
+      <div id="need-mates" class="empty hidden">Add at least two flatmates first (Flatmates tab).</div>
+      <div id="entry-form">
+        <div class="seg">
+          <button id="seg-expense" class="on" data-type="expense">🧾 Shared expense</button>
+          <button id="seg-payment" data-type="payment">💵 Cash transfer</button>
         </div>
-        <div class="row" style="margin-top:10px">
-          <div>
-            <label>Paid by</label>
-            <select id="e-payer"></select>
+
+        <!-- EXPENSE FORM -->
+        <div id="form-expense">
+          <div class="row">
+            <div style="flex:2">
+              <label>Description</label>
+              <input id="e-desc" placeholder="e.g. Groceries, Electricity, Rent" />
+            </div>
+            <div>
+              <label>Amount</label>
+              <input id="e-amt" type="number" min="0" step="0.01" placeholder="0.00" />
+            </div>
           </div>
-          <div>
-            <label>Date</label>
-            <input id="e-date" type="date" />
+          <div class="row" style="margin-top:10px">
+            <div>
+              <label>Paid by</label>
+              <select id="e-payer"></select>
+            </div>
+            <div>
+              <label>Date</label>
+              <input id="e-date" type="date" />
+            </div>
           </div>
+          <div style="margin-top:12px">
+            <label>Split between <span id="split-hint" style="color:var(--muted)"></span>
+              <span class="mini" id="split-all">all</span> · <span class="mini" id="split-none">none</span>
+            </label>
+            <div class="split-grid" id="e-split"></div>
+          </div>
+          <div class="actions"><button class="btn" id="add-expense">Add expense</button></div>
         </div>
-        <div style="margin-top:12px">
-          <label>Split between <span id="split-hint" style="color:var(--muted)"></span></label>
-          <div class="split-grid" id="e-split"></div>
-        </div>
-        <div class="actions">
-          <button class="btn" id="add-expense">Add expense</button>
+
+        <!-- PAYMENT FORM -->
+        <div id="form-payment" class="hidden">
+          <p class="sub" style="color:var(--muted);font-size:12.5px;margin:0 0 12px">
+            One flatmate handed cash to another (e.g. monthly contribution, paying back a loan).
+          </p>
+          <div class="row">
+            <div><label>From (gave money)</label><select id="p-from"></select></div>
+            <div><label>To (received)</label><select id="p-to"></select></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <div><label>Amount</label><input id="p-amt" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+            <div><label>Date</label><input id="p-date" type="date" /></div>
+          </div>
+          <div style="margin-top:10px">
+            <label>Note (optional)</label>
+            <input id="p-note" placeholder="e.g. July contribution, loan repayment" />
+          </div>
+          <div class="actions"><button class="btn" id="add-payment" style="background:var(--pay);color:#06222a">Add transfer</button></div>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <h2>History <span id="hist-count"></span></h2>
+      <h2>History
+        <span id="hist-count"></span>
+        <span class="spacer"></span>
+        <select class="mfilter" id="month-hist"></select>
+      </h2>
       <div class="list" id="expense-list"></div>
       <div class="totline hidden" id="tot-line">
-        <span>Total group spend</span><b id="tot-amt"></b>
+        <span id="tot-label">Total group spend</span><b id="tot-amt"></b>
       </div>
     </div>
   </section>
@@ -168,7 +214,10 @@
   <!-- BALANCES -->
   <section id="tab-balances" class="hidden">
     <div class="card">
-      <h2>Who owes whom <span>· simplified loans</span></h2>
+      <h2>Who owes whom <span>· fewest transfers</span>
+        <span class="spacer"></span>
+        <select class="mfilter" id="month-bal"></select>
+      </h2>
       <div class="list" id="settle-list"></div>
     </div>
     <div class="card">
@@ -213,27 +262,37 @@
   "use strict";
   const LS_KEY = "monty.v1";
   const CURRENCIES = [
-    ["₹","INR"],["$","USD"],["€","EUR"],["£","GBP"],["¥","JPY"],["A$","AUD"],["C$","CAD"],["د.إ","AED"]
+    ["रू","NPR"],["₹","INR"],["$","USD"],["€","EUR"],["£","GBP"],["¥","JPY"],["A$","AUD"],["C$","CAD"],["د.إ","AED"]
   ];
   const COLORS = ["#6c8cff","#4ade80","#fbbf24","#f472b6","#22d3ee","#a78bfa","#fb923c","#34d399","#f87171","#60a5fa"];
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
   let state = load();
+  let entryType = "expense";
+  let filterMonth = "all"; // "all" or "YYYY-MM"
 
   function load(){
-    try{
-      const s = JSON.parse(localStorage.getItem(LS_KEY));
-      if(s && Array.isArray(s.mates) && Array.isArray(s.expenses)) return s;
-    }catch(e){}
-    return { mates:[], expenses:[], currency:"₹" };
+    let s=null;
+    try{ s=JSON.parse(localStorage.getItem(LS_KEY)); }catch(e){}
+    if(!s || !Array.isArray(s.mates)) return { mates:[], txns:[], currency:"रू" };
+    // migrate old {expenses:[...]} format -> txns
+    if(!Array.isArray(s.txns)){
+      s.txns = (s.expenses||[]).map(e=>Object.assign({type:"expense"},e));
+    }
+    delete s.expenses;
+    if(!s.currency) s.currency="रू";
+    return s;
   }
   function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
   const $ = id => document.getElementById(id);
   const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  const money = n => state.currency + (Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const money = n => state.currency + " " + (Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
   const initials = n => n.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase() || "?";
-  const colorFor = id => COLORS[state.mates.findIndex(m=>m.id===id) % COLORS.length];
+  const colorFor = id => COLORS[Math.max(0,state.mates.findIndex(m=>m.id===id)) % COLORS.length];
   const mateById = id => state.mates.find(m=>m.id===id);
+  const first = n => esc(n.split(/\s+/)[0]);
+  const monthLabel = ym => MONTHS[+ym.slice(5,7)-1]+" "+ym.slice(0,4);
 
   // ---------- currency ----------
   const curSel = $("currency");
@@ -254,6 +313,18 @@
     };
   });
 
+  // ---------- entry type toggle ----------
+  $("seg-expense").onclick=()=>setType("expense");
+  $("seg-payment").onclick=()=>setType("payment");
+  function setType(t){
+    entryType=t;
+    $("seg-expense").classList.toggle("on",t==="expense");
+    $("seg-payment").classList.toggle("on",t==="payment");
+    $("seg-payment").classList.toggle("pay",t==="payment");
+    $("form-expense").classList.toggle("hidden",t!=="expense");
+    $("form-payment").classList.toggle("hidden",t!=="payment");
+  }
+
   // ---------- flatmates ----------
   $("add-mate").onclick = ()=>{
     const name=$("m-name").value.trim(), email=$("m-email").value.trim();
@@ -264,43 +335,65 @@
     save(); renderAll(); $("m-name").focus();
   };
   function removeMate(id){
-    const used = state.expenses.some(e=>e.payer===id || e.split.includes(id));
-    if(used && !confirm("This flatmate is part of existing expenses. Removing them will also delete those expenses. Continue?")) return;
-    state.expenses = state.expenses.filter(e=>e.payer!==id && !e.split.includes(id));
+    const used = state.txns.some(t=> t.payer===id || t.from===id || t.to===id || (t.split||[]).includes(id));
+    if(used && !confirm("This flatmate appears in ledger entries. Removing them will also delete those entries. Continue?")) return;
+    state.txns = state.txns.filter(t=> t.payer!==id && t.from!==id && t.to!==id && !(t.split||[]).includes(id));
     state.mates = state.mates.filter(m=>m.id!==id);
     save(); renderAll();
   }
 
-  // ---------- expenses ----------
-  function selectedSplit(){
-    return [...document.querySelectorAll("#e-split .chip.on")].map(c=>c.dataset.id);
-  }
+  // ---------- add expense ----------
+  function selectedSplit(){ return [...document.querySelectorAll("#e-split .chip.on")].map(c=>c.dataset.id); }
+  $("split-all").onclick=()=>{ document.querySelectorAll("#e-split .chip").forEach(c=>c.classList.add("on")); updateSplitHint(); };
+  $("split-none").onclick=()=>{ document.querySelectorAll("#e-split .chip").forEach(c=>c.classList.remove("on")); updateSplitHint(); };
   $("add-expense").onclick = ()=>{
     const desc=$("e-desc").value.trim();
     const amt=parseFloat($("e-amt").value);
     const payer=$("e-payer").value;
-    const date=$("e-date").value || new Date().toISOString().slice(0,10);
+    const date=$("e-date").value || todayStr();
     const split=selectedSplit();
     if(!desc){ $("e-desc").focus(); return; }
     if(!(amt>0)){ $("e-amt").focus(); return; }
     if(!payer){ alert("Select who paid."); return; }
     if(split.length===0){ alert("Select at least one person to split between."); return; }
-    state.expenses.push({id:uid(),desc,amt,payer,date,split});
+    state.txns.push({id:uid(),type:"expense",desc,amt,payer,date,split});
     $("e-desc").value=""; $("e-amt").value="";
     save(); renderAll(); $("e-desc").focus();
   };
-  function removeExpense(id){
-    state.expenses = state.expenses.filter(e=>e.id!==id);
+
+  // ---------- add payment ----------
+  $("add-payment").onclick = ()=>{
+    const from=$("p-from").value, to=$("p-to").value;
+    const amt=parseFloat($("p-amt").value);
+    const date=$("p-date").value || todayStr();
+    const note=$("p-note").value.trim();
+    if(!from||!to){ alert("Select both people."); return; }
+    if(from===to){ alert("From and To must be different people."); return; }
+    if(!(amt>0)){ $("p-amt").focus(); return; }
+    state.txns.push({id:uid(),type:"payment",from,to,amt,date,desc:note});
+    $("p-amt").value=""; $("p-note").value="";
     save(); renderAll();
-  }
+  };
+
+  function removeTxn(id){ state.txns=state.txns.filter(t=>t.id!==id); save(); renderAll(); }
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
 
   // ---------- balances / settlement ----------
-  function computeBalances(){
+  function txnsInScope(){
+    return filterMonth==="all" ? state.txns : state.txns.filter(t=>(t.date||"").slice(0,7)===filterMonth);
+  }
+  function computeBalances(txns){
     const bal={}; state.mates.forEach(m=>bal[m.id]=0);
-    state.expenses.forEach(e=>{
-      const share = e.amt/e.split.length;
-      if(bal[e.payer]!==undefined) bal[e.payer]+=e.amt;
-      e.split.forEach(id=>{ if(bal[id]!==undefined) bal[id]-=share; });
+    txns.forEach(t=>{
+      if(t.type==="payment"){
+        if(bal[t.from]!==undefined) bal[t.from]+=t.amt;   // giver is owed
+        if(bal[t.to]!==undefined)   bal[t.to]-=t.amt;     // receiver owes
+      }else{
+        const n=t.split.length; if(!n) return;
+        const share=t.amt/n;
+        if(bal[t.payer]!==undefined) bal[t.payer]+=t.amt;
+        t.split.forEach(id=>{ if(bal[id]!==undefined) bal[id]-=share; });
+      }
     });
     return bal;
   }
@@ -321,6 +414,21 @@
     return out;
   }
 
+  // ---------- month filters ----------
+  function availableMonths(){
+    return [...new Set(state.txns.map(t=>(t.date||"").slice(0,7)).filter(Boolean))].sort().reverse();
+  }
+  function buildMonthSelect(sel){
+    const months=availableMonths();
+    sel.innerHTML = `<option value="all">All time (combined)</option>` +
+      months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join("");
+    if(filterMonth!=="all" && !months.includes(filterMonth)) filterMonth="all";
+    sel.value=filterMonth;
+  }
+  function onMonthChange(e){ filterMonth=e.target.value; renderAll(); }
+  $("month-hist").onchange=onMonthChange;
+  $("month-bal").onchange=onMonthChange;
+
   // ---------- render ----------
   function avatar(m){ return `<div class="avatar" style="background:${colorFor(m.id)}">${esc(initials(m.name))}</div>`; }
 
@@ -340,15 +448,20 @@
     list.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>removeMate(b.dataset.rm));
   }
 
-  function renderExpenseForm(){
-    const has = state.mates.length>0;
-    $("need-mates").classList.toggle("hidden",has);
-    $("expense-form").classList.toggle("hidden",!has);
-    if(!has) return;
-    const payer=$("e-payer");
-    const prev=payer.value;
-    payer.innerHTML = state.mates.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
-    if(state.mates.some(m=>m.id===prev)) payer.value=prev;
+  function fillPeople(sel,keep){
+    const prev=keep!==undefined?keep:sel.value;
+    sel.innerHTML = state.mates.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
+    if(state.mates.some(m=>m.id===prev)) sel.value=prev;
+  }
+  function renderEntryForm(){
+    const ok = state.mates.length>=2;
+    $("need-mates").classList.toggle("hidden",ok);
+    $("entry-form").classList.toggle("hidden",!ok);
+    if(!ok) return;
+    fillPeople($("e-payer"));
+    fillPeople($("p-from"));
+    fillPeople($("p-to"), state.mates[1] && $("p-to").value ? $("p-to").value : (state.mates[1]||{}).id);
+    // split chips
     const split=$("e-split");
     const onIds = split.querySelector(".chip") ? selectedSplit() : state.mates.map(m=>m.id);
     split.innerHTML = state.mates.map(m=>{
@@ -356,7 +469,8 @@
       return `<div class="chip ${on?'on':''}" data-id="${m.id}"><span class="dot"></span>${esc(m.name)}</div>`;
     }).join("");
     split.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{ c.classList.toggle("on"); updateSplitHint(); });
-    if(!$("e-date").value) $("e-date").value=new Date().toISOString().slice(0,10);
+    if(!$("e-date").value) $("e-date").value=todayStr();
+    if(!$("p-date").value) $("p-date").value=todayStr();
     updateSplitHint();
   }
   function updateSplitHint(){
@@ -368,39 +482,60 @@
   }
   $("e-amt").addEventListener("input",updateSplitHint);
 
-  function renderExpenseList(){
-    $("badge-exp").textContent = state.expenses.length;
+  function renderHistory(){
+    $("badge-exp").textContent = state.txns.length;
+    buildMonthSelect($("month-hist"));
     const list=$("expense-list");
-    const items=[...state.expenses].sort((a,b)=>(b.date+b.id).localeCompare(a.date+a.id));
-    if(!items.length){ list.innerHTML=`<div class="empty">No expenses yet.</div>`; $("tot-line").classList.add("hidden"); $("hist-count").textContent=""; return; }
+    const items=[...txnsInScope()].sort((a,b)=>(b.date+b.id).localeCompare(a.date+a.id));
+    if(!items.length){
+      list.innerHTML=`<div class="empty">${state.txns.length?"Nothing in this month.":"Nothing yet. Add a shared expense or a cash transfer above."}</div>`;
+      $("tot-line").classList.add("hidden"); $("hist-count").textContent=""; return;
+    }
     $("hist-count").innerHTML=`<span style="color:var(--muted);font-weight:500">· ${items.length}</span>`;
-    list.innerHTML = items.map(e=>{
-      const payer=mateById(e.payer);
-      const share=e.amt/e.split.length;
-      const names=e.split.map(id=>{const m=mateById(id);return m?esc(m.name.split(/\s+/)[0]):"?";}).join(", ");
+    list.innerHTML = items.map(t=>{
+      if(t.type==="payment"){
+        const f=mateById(t.from), to=mateById(t.to);
+        return `<div class="item exp">
+          <div class="head">
+            ${f?avatar(f):""}
+            <div class="desc">${esc(f?f.name:"?")} <span style="color:var(--muted)">→</span> ${esc(to?to.name:"?")}
+              <span class="pill pay">cash</span></div>
+            <div class="amt" style="color:var(--pay)">${money(t.amt)}</div>
+            <button class="btn danger sm" data-rmx="${t.id}">✕</button>
+          </div>
+          <div class="sub">${esc(t.date)}${t.desc?" · "+esc(t.desc):" · cash transfer"}</div>
+        </div>`;
+      }
+      const payer=mateById(t.payer);
+      const share=t.amt/t.split.length;
+      const names=t.split.map(id=>{const m=mateById(id);return m?first(m.name):"?";}).join(", ");
       return `<div class="item exp">
         <div class="head">
           ${payer?avatar(payer):""}
-          <div class="desc">${esc(e.desc)}</div>
-          <div class="amt">${money(e.amt)}</div>
-          <button class="btn danger sm" data-rmx="${e.id}">✕</button>
+          <div class="desc">${esc(t.desc)} <span class="pill exp">expense</span></div>
+          <div class="amt">${money(t.amt)}</div>
+          <button class="btn danger sm" data-rmx="${t.id}">✕</button>
         </div>
-        <div class="sub">${payer?esc(payer.name):"?"} paid · ${esc(e.date)}</div>
-        <div class="breakdown">Split ${e.split.length} ways → <b>${money(share)}</b> each &nbsp;·&nbsp; ${names}</div>
+        <div class="sub">${payer?esc(payer.name):"?"} paid · ${esc(t.date)}</div>
+        <div class="breakdown">Split ${t.split.length} ways → <b>${money(share)}</b> each &nbsp;·&nbsp; ${names}</div>
       </div>`;
     }).join("");
-    list.querySelectorAll("[data-rmx]").forEach(b=>b.onclick=()=>removeExpense(b.dataset.rmx));
-    const tot=state.expenses.reduce((s,e)=>s+e.amt,0);
-    $("tot-amt").textContent=money(tot);
+    list.querySelectorAll("[data-rmx]").forEach(b=>b.onclick=()=>removeTxn(b.dataset.rmx));
+    const exp=txnsInScope().filter(t=>t.type!=="payment").reduce((s,e)=>s+e.amt,0);
+    const pay=txnsInScope().filter(t=>t.type==="payment").reduce((s,e)=>s+e.amt,0);
+    $("tot-label").textContent = "Group spend"+(pay?` · transfers ${money(pay)}`:"");
+    $("tot-amt").textContent=money(exp);
     $("tot-line").classList.remove("hidden");
   }
 
   function renderBalances(){
-    const bal=computeBalances();
+    buildMonthSelect($("month-bal"));
+    const txns=txnsInScope();
+    const bal=computeBalances(txns);
     const setl=settlements(bal);
     const sl=$("settle-list");
-    if(!state.mates.length){ sl.innerHTML=`<div class="empty">Add flatmates and expenses to see settlements.</div>`; }
-    else if(!setl.length){ sl.innerHTML=`<div class="allsettled">✓ All settled up — nobody owes anything.</div>`; }
+    if(state.mates.length<2){ sl.innerHTML=`<div class="empty">Add flatmates and entries to see settlements.</div>`; }
+    else if(!setl.length){ sl.innerHTML=`<div class="allsettled">✓ All settled up — nobody owes anything${filterMonth==="all"?"":" this month"}.</div>`; }
     else{
       sl.innerHTML=setl.map(s=>{
         const f=mateById(s.from),t=mateById(s.to);
@@ -418,7 +553,7 @@
     bl.innerHTML=state.mates.map(m=>{
       const v=Math.round((bal[m.id]||0)*100)/100;
       const cls=v>0.005?"pos":v<-0.005?"neg":"";
-      const label=v>0.005?"gets back":v<-0.005?"owes":"settled";
+      const label=v>0.005?"gets back":v<-0.005?"owes / lent out":"settled";
       return `<div class="item bal">
         ${avatar(m)}
         <div class="meta"><div class="n">${esc(m.name)}</div><div class="e">${label}</div></div>
@@ -429,7 +564,7 @@
 
   function renderAll(){
     curSel.value=state.currency;
-    renderMates(); renderExpenseForm(); renderExpenseList(); renderBalances();
+    renderMates(); renderEntryForm(); renderHistory(); renderBalances();
   }
 
   // ---------- data tools ----------
@@ -443,14 +578,16 @@
     const f=e.target.files[0]; if(!f)return;
     const r=new FileReader();
     r.onload=()=>{ try{
-      const d=JSON.parse(r.result);
-      if(!Array.isArray(d.mates)||!Array.isArray(d.expenses)) throw 0;
-      state=Object.assign({currency:"₹"},d); save(); renderAll(); alert("Imported.");
+      let d=JSON.parse(r.result);
+      if(!Array.isArray(d.mates)) throw 0;
+      if(!Array.isArray(d.txns)) d.txns=(d.expenses||[]).map(x=>Object.assign({type:"expense"},x));
+      delete d.expenses;
+      state=Object.assign({currency:"रू"},d); save(); renderAll(); alert("Imported.");
     }catch(_){ alert("Invalid file."); } };
     r.readAsText(f); e.target.value="";
   };
-  $("reset").onclick=()=>{ if(confirm("Delete all flatmates and expenses? This cannot be undone.")){
-    state={mates:[],expenses:[],currency:state.currency}; save(); renderAll();
+  $("reset").onclick=()=>{ if(confirm("Delete all flatmates and ledger entries? This cannot be undone.")){
+    state={mates:[],txns:[],currency:state.currency}; filterMonth="all"; save(); renderAll();
   }};
 
   renderAll();
