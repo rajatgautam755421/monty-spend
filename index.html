@@ -80,6 +80,11 @@
   .prow{cursor:pointer}
   .prow .ph{font-size:12px;color:var(--pay);font-weight:600}
   .qrmini{width:34px;height:34px;border-radius:8px;flex:0 0 auto;background:var(--bg);display:grid;place-items:center;font-size:16px}
+  .pic-edit{display:flex;align-items:center;gap:14px;margin:4px 0 16px}
+  .pic-prev{width:72px;height:72px;border-radius:50%;flex:0 0 auto;background:var(--bg);background-size:cover;background-position:center;
+    display:grid;place-items:center;font-size:26px;color:var(--faint);border:2px solid var(--line)}
+  .pic-btns{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+  .pic-btns .btn{width:auto;padding:9px 14px}
   .qrbox{text-align:center;margin:4px 0 16px}
   .qrbox img{width:210px;height:210px;border-radius:14px;background:#fff;padding:8px;box-shadow:var(--sh-1)}
   .qrbox .nm{font-weight:800;font-size:16px;margin-top:10px}
@@ -402,6 +407,14 @@
     <h3 id="c-title" style="margin:0;flex:1">Contact & eSewa</h3>
     <button class="link linkd hidden" id="c-del">🗑 Delete</button>
   </div>
+  <div class="pic-edit">
+    <div class="pic-prev" id="c-pic"></div>
+    <div class="pic-btns">
+      <button class="btn sec" id="c-pic-upload">📷 Upload photo</button>
+      <button class="link linkd hidden" id="c-pic-remove">Remove photo</button>
+    </div>
+    <input type="file" id="c-pic-file" accept="image/*" class="hidden" />
+  </div>
   <div class="qrbox" id="c-qrbox"></div>
   <div class="field hidden" id="c-name-field"><label>Name</label><input class="in" id="c-name" placeholder="e.g. Gharbeti Uncle" /></div>
   <div class="field"><label>Phone / eSewa ID</label><input class="in" id="c-phone" inputmode="tel" placeholder="98XXXXXXXX" /></div>
@@ -481,8 +494,11 @@ window.FIREBASE_CONFIG = {
   const OWNER_EMAIL="gautamrajat185@gmail.com";
   function isOwner(){return !!(currentUser&&currentUser.email&&currentUser.email.toLowerCase()===OWNER_EMAIL);}
   const delBtn=id=>isOwner()?`<div class="del" data-del="${id}">Delete</div>`:"";
-  const av=(id,name,size)=>`<div class="av" style="background:${colorFor(id)}${size?';width:'+size+'px;height:'+size+'px;font-size:'+(size/2.7)+'px':''}">${esc(initials(name))}</div>`;
+  const av=(id,name,size)=>{const dim=size||40,pic=picOf(id),base=`width:${dim}px;height:${dim}px;font-size:${dim/2.7}px`;
+    return pic?`<div class="av" style="${base};background-image:url('${pic}');background-size:cover;background-position:center"></div>`
+      :`<div class="av" style="${base};background:${colorFor(id)}">${esc(initials(name))}</div>`;};
   const qrSrc=m=>m&&m.qr?m.qr:(m&&m.phone?"https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data="+encodeURIComponent(m.phone):"");
+  function picOf(id){const m=state.mates.find(x=>x.id===id)||(state.payees||[]).find(x=>x.id===id);return m&&m.pic?m.pic:"";}
   function flash(msg){const f=$("flash");f.textContent=msg;f.classList.add("show");clearTimeout(f._t);f._t=setTimeout(()=>f.classList.remove("show"),1800);}
 
   /* ===== cloud ===== */
@@ -730,7 +746,7 @@ window.FIREBASE_CONFIG = {
   function renderPayees(){
     const l=$("payee-list");
     l.innerHTML=(state.payees&&state.payees.length)?state.payees.map(p=>`<div class="prow" data-payee="${p.id}">
-      <div class="av" style="background:#64748b">${esc(initials(p.name))}</div>
+      ${av(p.id,p.name)}
       <div class="t"><div class="n">${esc(p.name)}</div><div class="e">${p.phone?`<span class="ph">📱 ${esc(p.phone)}</span>`:"tap to view / edit QR"}</div></div>
       <div class="qrmini">${qrSrc(p)?"📱":"＋"}</div></div>`).join("")
       :`<div class="empty" style="padding:16px">No saved payees yet.${isOwner()?" Add your landlord’s eSewa below.":""}</div>`;
@@ -844,13 +860,18 @@ window.FIREBASE_CONFIG = {
     addMate({id:uid(),name,email,phone});$("m-name").value="";$("m-email").value="";$("m-phone").value="";flash("Flatmate added ✓");};
 
   /* ===== contact / eSewa QR (mates + payees) ===== */
-  let contactId=null, contactQr="", contactKind="mate";
+  let contactId=null, contactQr="", contactKind="mate", contactPic="";
+  function renderPicPreview(){const el=$("c-pic");
+    if(contactPic){el.style.backgroundImage="url('"+contactPic+"')";el.textContent="";}
+    else{el.style.backgroundImage="";el.textContent="👤";}
+    $("c-pic-remove").classList.toggle("hidden",!contactPic);}
   function curName(){return contactKind==="payee"?$("c-name").value.trim():$("c-title").textContent;}
   function contactPreview(){renderContactQR({name:curName(),phone:$("c-phone").value.trim(),qr:contactQr});}
   function renderContactQR(m){const src=qrSrc(m);
     $("c-qrbox").innerHTML=src?`<img src="${src}" alt="QR" referrerpolicy="no-referrer"/><div class="nm">${esc(m.name||"")}</div>${m.phone?`<div class="pn">eSewa · ${esc(m.phone)}</div>`:""}`
       :`<div class="none">No phone or QR yet — add a number or upload a QR, then Save.</div>`;}
-  function openContactObj(obj,kind,isNew){contactId=obj.id;contactKind=kind;contactQr=obj.qr||"";
+  function openContactObj(obj,kind,isNew){contactId=obj.id;contactKind=kind;contactQr=obj.qr||"";contactPic=obj.pic||"";
+    renderPicPreview();
     $("c-title").textContent=isNew?(kind==="payee"?"New payee":"Contact"):obj.name;
     $("c-name-field").classList.toggle("hidden",kind!=="payee");
     $("c-name").value=obj.name||"";
@@ -882,14 +903,25 @@ window.FIREBASE_CONFIG = {
         $("c-qrlink").value="";contactPreview();flash("QR attached — tap Save");};
       img.onerror=()=>flash("Couldn't read that image");img.src=rd.result;};
     rd.readAsDataURL(f);e.target.value="";};
+  $("c-pic-upload").onclick=()=>$("c-pic-file").click();
+  $("c-pic-remove").onclick=()=>{contactPic="";renderPicPreview();flash("Photo removed — tap Save");};
+  $("c-pic-file").onchange=e=>{const f=e.target.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{const img=new Image();
+      img.onload=()=>{const max=256;const s=Math.min(img.width,img.height);
+        const cv=document.createElement("canvas");cv.width=max;cv.height=max;
+        cv.getContext("2d").drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,max,max);
+        contactPic=cv.toDataURL("image/jpeg",0.82);renderPicPreview();flash("Photo added — tap Save");};
+      img.onerror=()=>flash("Couldn't read that image");img.src=rd.result;};
+    rd.readAsDataURL(f);e.target.value="";};
   $("c-save").onclick=()=>{if(!contactId)return;
     if(contactKind==="payee"){if(!isOwner())return flash("Only the owner can edit payees");
       const name=$("c-name").value.trim();if(!name)return flash("Enter a name");
-      updatePayee({id:contactId,name,phone:$("c-phone").value.trim(),qr:contactQr});
+      updatePayee({id:contactId,name,phone:$("c-phone").value.trim(),qr:contactQr,pic:contactPic});
       flash("Payee saved ✓");closeContact();return;}
     const m=Object.assign({},mateById(contactId));if(!m.id)return;
-    m.phone=$("c-phone").value.trim();m.qr=contactQr;
-    updateMate(m);contactPreview();flash("Contact saved ✓");};
+    m.phone=$("c-phone").value.trim();m.qr=contactQr;m.pic=contactPic;
+    updateMate(m);flash("Contact saved ✓");closeContact();};
   function renderPayQR(){const to=mateById($("p-to").value),src=qrSrc(to),box=$("pay-qr");
     if(to&&(src||to.phone)){box.classList.remove("hidden");
       box.innerHTML=(src?`<img src="${src}" referrerpolicy="no-referrer"/>`:`<div class="big">📱</div>`)
