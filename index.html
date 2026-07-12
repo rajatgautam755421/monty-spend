@@ -304,6 +304,10 @@
     </div>
     <div class="card pad hidden" id="add-mate-note" style="color:var(--muted);font-size:13px;text-align:center">🔒 Only the group owner can add or remove flatmates. Tap a name to edit phone / eSewa QR.</div>
 
+    <div class="sec-title">Rent & other payees</div>
+    <div class="card" id="payee-list" style="margin-bottom:10px"></div>
+    <button class="btn sec hidden" id="add-payee-btn">+ Add payee (landlord, etc.)</button>
+
     <div class="sec-title">Settings</div>
     <div class="card">
       <div class="prow"><div class="t"><div class="n">Currency</div></div>
@@ -397,8 +401,12 @@
 <div class="scrim" id="scrim-c"></div>
 <div class="sheet" id="sheet-c">
   <div class="grab"></div>
-  <h3 id="c-title">Contact & eSewa</h3>
+  <div style="display:flex;align-items:center;gap:10px;margin:6px 2px 12px">
+    <h3 id="c-title" style="margin:0;flex:1">Contact & eSewa</h3>
+    <button class="link linkd hidden" id="c-del">🗑 Delete</button>
+  </div>
   <div class="qrbox" id="c-qrbox"></div>
+  <div class="field hidden" id="c-name-field"><label>Name</label><input class="in" id="c-name" placeholder="e.g. Gharbeti Uncle" /></div>
   <div class="field"><label>Phone / eSewa ID</label><input class="in" id="c-phone" inputmode="tel" placeholder="98XXXXXXXX" /></div>
   <div class="field"><label>eSewa QR</label>
     <div class="frow">
@@ -459,8 +467,9 @@ window.FIREBASE_CONFIG = {
   function sanitizeRoom(s){return String(s).toLowerCase().replace(/[^a-z0-9\-_]/g,"-").replace(/^-+|-+$/g,"").slice(0,40)||"flat";}
 
   function load(){let s=null;try{s=JSON.parse(localStorage.getItem(LS_KEY));}catch(e){}
-    if(!s||!Array.isArray(s.mates))return{mates:[],txns:[],currency:"रू"};
+    if(!s||!Array.isArray(s.mates))return{mates:[],txns:[],currency:"रू",payees:[]};
     if(!Array.isArray(s.txns))s.txns=(s.expenses||[]).map(e=>Object.assign({type:"expense"},e));
+    if(!Array.isArray(s.payees))s.payees=[];
     delete s.expenses; if(!s.currency)s.currency="रू"; return s;}
   function saveLocal(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
   const $=id=>document.getElementById(id);
@@ -487,10 +496,11 @@ window.FIREBASE_CONFIG = {
   function adoptCloud(v){v=v||{};
     state.mates=v.mates?Object.values(v.mates).sort((a,b)=>String(a.id).localeCompare(String(b.id))):[];
     state.txns=v.txns?Object.values(v.txns):[];
+    state.payees=v.payees?Object.values(v.payees):[];
     if(v.meta&&v.meta.currency)state.currency=v.meta.currency;
     saveLocal();renderAll();}
-  function seedCloud(){seeding=true;const p={meta:{currency:state.currency},mates:{},txns:{}};
-    state.mates.forEach(m=>p.mates[m.id]=m);state.txns.forEach(t=>p.txns[t.id]=t);
+  function seedCloud(){seeding=true;const p={meta:{currency:state.currency},mates:{},txns:{},payees:{}};
+    state.mates.forEach(m=>p.mates[m.id]=m);state.txns.forEach(t=>p.txns[t.id]=t);(state.payees||[]).forEach(x=>p.payees[x.id]=x);
     cloudRef.set(p).finally(()=>{seeding=false;});}
   function connectRoom(){if(!window.firebase||!CFG.apiKey)return;
     if(cloudRef){cloudRef.off();cloudRef=null;}
@@ -537,6 +547,8 @@ window.FIREBASE_CONFIG = {
   /* ===== mutations ===== */
   function addMate(m){state.mates.push(m);saveLocal();renderAll();pushCloud("mates/"+m.id,m);}
   function updateMate(m){const i=state.mates.findIndex(x=>x.id===m.id);if(i>=0)state.mates[i]=m;saveLocal();renderAll();pushCloud("mates/"+m.id,m);}
+  function updatePayee(p){const i=state.payees.findIndex(x=>x.id===p.id);if(i>=0)state.payees[i]=p;else state.payees.push(p);saveLocal();renderAll();pushCloud("payees/"+p.id,p);}
+  function removePayee(id){state.payees=state.payees.filter(p=>p.id!==id);saveLocal();renderAll();pushCloud("payees/"+id,null);}
   function removeMate(id){const rm=state.txns.filter(t=>involves(t,id)).map(t=>t.id);
     state.txns=state.txns.filter(t=>!involves(t,id));state.mates=state.mates.filter(m=>m.id!==id);
     if(me===id){me="";localStorage.removeItem("monty.me");}
@@ -722,9 +734,19 @@ window.FIREBASE_CONFIG = {
     c.querySelectorAll("[data-pdel]").forEach(b=>b.onclick=()=>{if(personalRef&&confirm("Delete?"))personalRef.child(b.dataset.pdel).remove();});
   }
 
+  function renderPayees(){
+    const l=$("payee-list");
+    l.innerHTML=(state.payees&&state.payees.length)?state.payees.map(p=>`<div class="prow" data-payee="${p.id}">
+      <div class="av" style="background:#64748b">${esc(initials(p.name))}</div>
+      <div class="t"><div class="n">${esc(p.name)}</div><div class="e">${p.phone?`<span class="ph">📱 ${esc(p.phone)}</span>`:"tap to view / edit QR"}</div></div>
+      <div class="qrmini">${qrSrc(p)?"📱":"＋"}</div></div>`).join("")
+      :`<div class="empty" style="padding:16px">No saved payees yet.${isOwner()?" Add your landlord’s eSewa below.":""}</div>`;
+    l.querySelectorAll("[data-payee]").forEach(el=>el.onclick=()=>openPayee(el.dataset.payee));
+    $("add-payee-btn").classList.toggle("hidden",!isOwner());
+  }
   function renderAll(){
     $("currency").value=state.currency;
-    buildMonths();renderSummary();renderActivity();renderPeople();renderPersonal();renderAccount();
+    buildMonths();renderSummary();renderActivity();renderPeople();renderPayees();renderPersonal();renderAccount();
   }
 
   /* ===== nav ===== */
@@ -828,19 +850,30 @@ window.FIREBASE_CONFIG = {
     if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return flash("Invalid email");
     addMate({id:uid(),name,email,phone});$("m-name").value="";$("m-email").value="";$("m-phone").value="";flash("Flatmate added ✓");};
 
-  /* ===== contact / eSewa QR ===== */
-  let contactId=null, contactQr="";
-  function contactPreview(){renderContactQR({name:$("c-title").textContent,phone:$("c-phone").value.trim(),qr:contactQr});}
+  /* ===== contact / eSewa QR (mates + payees) ===== */
+  let contactId=null, contactQr="", contactKind="mate";
+  function curName(){return contactKind==="payee"?$("c-name").value.trim():$("c-title").textContent;}
+  function contactPreview(){renderContactQR({name:curName(),phone:$("c-phone").value.trim(),qr:contactQr});}
   function renderContactQR(m){const src=qrSrc(m);
     $("c-qrbox").innerHTML=src?`<img src="${src}" alt="QR" referrerpolicy="no-referrer"/><div class="nm">${esc(m.name||"")}</div>${m.phone?`<div class="pn">eSewa · ${esc(m.phone)}</div>`:""}`
       :`<div class="none">No phone or QR yet — add a number or upload a QR, then Save.</div>`;}
-  function openContact(id){const m=mateById(id);if(!m)return;contactId=id;contactQr=m.qr||"";
-    $("c-title").textContent=m.name;contactPreview();
-    $("c-phone").value=m.phone||"";
-    $("c-qrlink").value=(m.qr&&m.qr.indexOf("data:")!==0)?m.qr:"";
+  function openContactObj(obj,kind,isNew){contactId=obj.id;contactKind=kind;contactQr=obj.qr||"";
+    $("c-title").textContent=isNew?(kind==="payee"?"New payee":"Contact"):obj.name;
+    $("c-name-field").classList.toggle("hidden",kind!=="payee");
+    $("c-name").value=obj.name||"";
+    $("c-phone").value=obj.phone||"";
+    $("c-qrlink").value=(obj.qr&&obj.qr.indexOf("data:")!==0)?obj.qr:"";
+    $("c-del").classList.toggle("hidden",!(kind==="payee"&&isOwner()&&!isNew));
+    contactPreview();
     $("scrim-c").classList.add("show");$("sheet-c").classList.add("show");}
+  function openContact(id){const m=mateById(id);if(m)openContactObj(m,"mate",false);}
+  function openPayee(id){const p=state.payees.find(x=>x.id===id);if(p)openContactObj(p,"payee",false);}
+  function openNewPayee(){if(!isOwner())return flash("Only the owner can add payees");openContactObj({id:uid(),name:"",phone:"",qr:""},"payee",true);}
   function closeContact(){$("scrim-c").classList.remove("show");$("sheet-c").classList.remove("show");contactId=null;}
   $("scrim-c").onclick=closeContact;
+  $("add-payee-btn").onclick=openNewPayee;
+  $("c-del").onclick=()=>{if(contactKind==="payee"&&contactId&&confirm("Delete this payee?")){removePayee(contactId);closeContact();flash("Payee deleted");}};
+  $("c-name").oninput=contactPreview;
   $("c-phone").oninput=contactPreview;
   $("c-qrlink").oninput=()=>{contactQr=$("c-qrlink").value.trim();contactPreview();};
   $("c-upload-btn").onclick=()=>$("c-file").click();
@@ -856,7 +889,12 @@ window.FIREBASE_CONFIG = {
         $("c-qrlink").value="";contactPreview();flash("QR attached — tap Save");};
       img.onerror=()=>flash("Couldn't read that image");img.src=rd.result;};
     rd.readAsDataURL(f);e.target.value="";};
-  $("c-save").onclick=()=>{if(!contactId)return;const m=Object.assign({},mateById(contactId));
+  $("c-save").onclick=()=>{if(!contactId)return;
+    if(contactKind==="payee"){if(!isOwner())return flash("Only the owner can edit payees");
+      const name=$("c-name").value.trim();if(!name)return flash("Enter a name");
+      updatePayee({id:contactId,name,phone:$("c-phone").value.trim(),qr:contactQr});
+      flash("Payee saved ✓");closeContact();return;}
+    const m=Object.assign({},mateById(contactId));if(!m.id)return;
     m.phone=$("c-phone").value.trim();m.qr=contactQr;
     updateMate(m);contactPreview();flash("Contact saved ✓");};
   function renderPayQR(){const to=mateById($("p-to").value),src=qrSrc(to),box=$("pay-qr");
@@ -902,21 +940,24 @@ window.FIREBASE_CONFIG = {
 
   /* ===== drag-to-dismiss sheets ===== */
   function attachSheetDrag(sheet,onClose){
-    let startY=null,dy=0,dragging=false;
-    const handles=[sheet.querySelector(".grab"),sheet.querySelector("h3")].filter(Boolean);
+    let startY=null,dy=0,armed=false,dragging=false;
     const yOf=e=>e.touches?e.touches[0].clientY:e.clientY;
-    const start=e=>{startY=yOf(e);dy=0;dragging=true;sheet.classList.add("dragging");};
-    const move=e=>{if(!dragging)return;dy=Math.max(0,yOf(e)-startY);sheet.style.transform="translateY("+dy+"px)";
-      if(e.cancelable&&e.touches)e.preventDefault();};
-    const end=()=>{if(!dragging)return;dragging=false;sheet.classList.remove("dragging");sheet.style.transform="";
-      if(dy>110)onClose();dy=0;startY=null;};
-    handles.forEach(h=>{
-      h.addEventListener("touchstart",start,{passive:true});
-      h.addEventListener("touchmove",move,{passive:false});
-      h.addEventListener("touchend",end);
-      h.addEventListener("mousedown",start);
-    });
-    document.addEventListener("mousemove",e=>{if(dragging)move(e);});
+    const start=e=>{const t=e.target;
+      if(t.closest&&t.closest("input,select,textarea,button,.chip,.qrbox,.payqr,img")){armed=false;return;}
+      if(sheet.scrollTop>0){armed=false;return;}
+      startY=yOf(e);dy=0;armed=true;dragging=false;};
+    const move=e=>{if(!armed)return;const d=yOf(e)-startY;
+      if(d<=2){if(!dragging)armed=false;return;}
+      dragging=true;dy=d;sheet.classList.add("dragging");sheet.style.transform="translateY("+dy+"px)";
+      if(e.cancelable)e.preventDefault();};
+    const end=()=>{armed=false;if(!dragging)return;
+      dragging=false;sheet.classList.remove("dragging");sheet.style.transform="";
+      if(dy>100)onClose();dy=0;startY=null;};
+    sheet.addEventListener("touchstart",start,{passive:true});
+    sheet.addEventListener("touchmove",move,{passive:false});
+    sheet.addEventListener("touchend",end);
+    sheet.addEventListener("mousedown",start);
+    document.addEventListener("mousemove",e=>{if(armed)move(e);});
     document.addEventListener("mouseup",end);
   }
   attachSheetDrag($("sheet"),closeSheet);
