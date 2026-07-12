@@ -480,14 +480,15 @@ window.FIREBASE_CONFIG = {
   function fmtDate(d){if(!d)return"";const p=String(d).slice(0,10).split("-");if(p.length!==3)return d;
     const y=+p[0],m=+p[1],day=+p[2];if(!m||!day)return d;
     const dt=new Date(Date.UTC(y,m-1,day));
+    const today=new Date();const ts=new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()));
+    const diff=Math.round((ts-dt)/86400000);
+    if(diff===0)return"Today";if(diff===1)return"Yesterday";if(diff===-1)return"Tomorrow";
+    if(diff>1&&diff<7)return diff+" days ago";
     if(dateMode==="BS"&&window.NepaliDate){try{
       const nd=new window.NepaliDate(new Date(y,m-1,day,12,0,0));
       const b=nd.getBS?nd.getBS():{year:nd.getYear(),month:nd.getMonth(),date:nd.getDate()};
       return WDAYS[dt.getUTCDay()]+", "+b.date+" "+BSMONTHS[b.month]+" "+b.year+" BS";
     }catch(e){}}
-    const today=new Date();const ts=new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()));
-    const diff=Math.round((ts-dt)/86400000);
-    if(diff===0)return"Today";if(diff===1)return"Yesterday";
     return WDAYS[dt.getUTCDay()]+", "+day+" "+MONTHS[m-1]+" "+y;}
 
   let state=load(), me=localStorage.getItem("monty.me")||"", filterMonth="all";
