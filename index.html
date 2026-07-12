@@ -792,13 +792,19 @@ window.FIREBASE_CONFIG = {
     buildMonths();renderSummary();renderActivity();renderPeople();renderPayees();renderPersonal();renderAccount();
   }
 
-  /* ===== nav ===== */
-  document.querySelectorAll(".nav a").forEach(a=>a.onclick=()=>{
-    document.querySelectorAll(".nav a").forEach(x=>x.classList.remove("on"));a.classList.add("on");
-    ["summary","activity","personal","group"].forEach(n=>$("tab-"+n).classList.toggle("hidden",n!==a.dataset.go));
+  /* ===== nav (URL hash routing) ===== */
+  const TABS=["summary","activity","personal","group"];
+  function showTab(name,fromHash){
+    if(!TABS.includes(name))name="summary";
+    document.querySelectorAll(".nav a").forEach(x=>x.classList.toggle("on",x.dataset.go===name));
+    TABS.forEach(n=>$("tab-"+n).classList.toggle("hidden",n!==name));
     window.scrollTo(0,0);
-  });
-  $("acct-btn").onclick=()=>document.querySelector('.nav a[data-go="personal"]').click();
+    if(!fromHash&&location.hash.slice(1)!==name)location.hash=name;
+  }
+  document.querySelectorAll(".nav a").forEach(a=>a.onclick=()=>showTab(a.dataset.go));
+  $("acct-btn").onclick=()=>showTab("personal");
+  window.addEventListener("hashchange",()=>showTab(location.hash.slice(1),true));
+  showTab(location.hash.slice(1)||"summary",true);
 
   /* ===== sheet ===== */
   function setKind(k){entryKind=k;
