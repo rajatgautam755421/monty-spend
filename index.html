@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/nepali-date-converter@3.3.0/dist/nepali-date-converter.umd.js"></script>
 <style>
   :root{
     --bg:#f4f5f7; --card:#fff; --ink:#111827; --muted:#6b7280; --faint:#9ca3af;
@@ -312,6 +313,8 @@
 
     <div class="sec-title">Settings</div>
     <div class="card">
+      <div class="prow"><div class="t"><div class="n">Calendar</div><div class="e">Dates in Nepali (BS) or English (AD)</div></div>
+        <div class="seg" id="cal-seg" style="margin:0;padding:3px"><button data-cal="BS">BS</button><button data-cal="AD">AD</button></div></div>
       <div class="prow"><div class="t"><div class="n">Currency</div></div>
         <select class="in" id="currency" style="width:auto;padding:8px 34px 8px 12px"></select></div>
       <div class="prow"><div class="t"><div class="n">Export CSV</div><div class="e">Spreadsheet of all entries</div></div>
@@ -464,9 +467,17 @@ window.FIREBASE_CONFIG = {
   const CATS=[["General","🧾"],["Groceries","🛒"],["Dining out","🍽️"],["Rent","🏠"],["Utilities","💡"],["Transport","🚕"],["Shopping","🛍️"],["Fun","🎉"],["Health","💊"]];
   const catIcon=c=>{const f=CATS.find(x=>x[0]===c);return f?f[1]:"🧾";};
   const WDAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const BSMONTHS=["Baisakh","Jestha","Ashadh","Shrawan","Bhadra","Ashwin","Kartik","Mangsir","Poush","Magh","Falgun","Chaitra"];
+  let dateMode=localStorage.getItem("monty.datemode")||"BS";
   function fmtDate(d){if(!d)return"";const p=String(d).slice(0,10).split("-");if(p.length!==3)return d;
     const y=+p[0],m=+p[1],day=+p[2];if(!m||!day)return d;
-    const dt=new Date(Date.UTC(y,m-1,day));const today=new Date();const ts=new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()));
+    const dt=new Date(Date.UTC(y,m-1,day));
+    if(dateMode==="BS"&&window.NepaliDate){try{
+      const nd=new window.NepaliDate(new Date(y,m-1,day,12,0,0));
+      const b=nd.getBS?nd.getBS():{year:nd.getYear(),month:nd.getMonth(),date:nd.getDate()};
+      return WDAYS[dt.getUTCDay()]+", "+b.date+" "+BSMONTHS[b.month]+" "+b.year+" BS";
+    }catch(e){}}
+    const today=new Date();const ts=new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()));
     const diff=Math.round((ts-dt)/86400000);
     if(diff===0)return"Today";if(diff===1)return"Yesterday";
     return WDAYS[dt.getUTCDay()]+", "+day+" "+MONTHS[m-1]+" "+y;}
@@ -937,6 +948,9 @@ window.FIREBASE_CONFIG = {
   $("p-to").addEventListener("change",renderPayQR);
   const cur=$("currency");CURRENCIES.forEach(([s,c])=>{const o=document.createElement("option");o.value=s;o.textContent=s+" "+c;cur.appendChild(o);});
   cur.value=state.currency;cur.onchange=()=>setCurrency(cur.value);
+  function paintCal(){document.querySelectorAll("#cal-seg button").forEach(b=>b.classList.toggle("on",b.dataset.cal===dateMode));}
+  document.querySelectorAll("#cal-seg button").forEach(b=>b.onclick=()=>{dateMode=b.dataset.cal;localStorage.setItem("monty.datemode",dateMode);paintCal();renderAll();});
+  paintCal();
 
   /* ===== share / data ===== */
   function inviteLink(){return location.origin+location.pathname;}
