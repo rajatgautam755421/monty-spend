@@ -60,6 +60,23 @@
     padding:3px 6px;outline:none;-webkit-appearance:none;text-align:center}
   .chev{width:26px;height:26px;border:none;background:var(--bg);border-radius:50%;display:grid;place-items:center;color:var(--muted);font-size:15px}
 
+  /* filters */
+  .filterbar{margin-bottom:10px}
+  .srch{margin-bottom:8px}
+  .frow2{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .frow2::-webkit-scrollbar{display:none}
+  .mini2{width:auto;flex:0 0 auto;padding:9px 30px 9px 12px;font-size:13px;font-weight:600;background-color:var(--card);border:1.5px solid var(--line)}
+  .chipbtn{flex:0 0 auto;border:1.5px solid var(--neg-bg);background:var(--neg-bg);border-radius:12px;padding:9px 14px;font-weight:700;font-size:13px;color:var(--neg)}
+  .catrow{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .catrow:last-child{margin-bottom:0}
+  .catrow .ci{font-size:16px;width:20px;flex:0 0 auto;text-align:center}
+  .catrow .cn{font-size:13px;font-weight:600;width:84px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .catrow .bar{flex:1;height:8px;border-radius:99px;background:var(--bg);overflow:hidden}
+  .catrow .bar i{display:block;height:100%;border-radius:99px;background:var(--brand)}
+  .catrow .cv{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;flex:0 0 auto;min-width:74px;text-align:right}
+  .act{cursor:pointer}
+  .owe-row.tapset{cursor:pointer}
+
   /* hero */
   .hero{background:linear-gradient(135deg,#6366f1,#7c74ff);color:#fff;border-radius:22px;padding:22px 20px;
     box-shadow:0 12px 30px rgba(99,102,241,.35);position:relative;overflow:hidden}
@@ -200,7 +217,18 @@
       <h2>Activity</h2>
       <div class="month-pick"><button class="chev" id="m-prev2">‹</button><select id="month-sel2"></select><button class="chev" id="m-next2">›</button></div>
     </div>
-    <div class="card pad" id="act-summary" style="margin-bottom:14px"></div>
+    <div class="card pad" id="act-summary" style="margin-bottom:12px"></div>
+    <div class="filterbar">
+      <input class="in srch" id="f-search" placeholder="🔍 Search…" />
+      <div class="frow2">
+        <select class="in mini2" id="f-type"></select>
+        <select class="in mini2" id="f-who"></select>
+        <select class="in mini2" id="f-cat"></select>
+        <button class="chipbtn hidden" id="f-clear">✕ Clear</button>
+      </div>
+    </div>
+    <div class="sec-title hidden" id="cat-title">Where it went</div>
+    <div class="card pad hidden" id="cat-card" style="margin-bottom:14px"></div>
     <div class="card" id="act-card"></div>
   </section>
 
@@ -263,6 +291,8 @@
     <div class="card">
       <div class="prow"><div class="t"><div class="n">Currency</div></div>
         <select class="in" id="currency" style="width:auto;padding:8px 34px 8px 12px"></select></div>
+      <div class="prow"><div class="t"><div class="n">Export CSV</div><div class="e">Spreadsheet of all entries</div></div>
+        <button class="link" id="export-csv">CSV</button></div>
       <div class="prow"><div class="t"><div class="n">Export data</div><div class="e">Download a JSON backup</div></div>
         <button class="link" id="export">Export</button></div>
       <div class="prow"><div class="t"><div class="n">Import data</div><div class="e">Restore from a backup file</div></div>
@@ -288,7 +318,10 @@
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet">
   <div class="grab"></div>
-  <h3 id="sheet-title">Add expense</h3>
+  <div style="display:flex;align-items:center;gap:10px;margin:6px 2px 14px">
+    <h3 id="sheet-title" style="margin:0;flex:1">Add expense</h3>
+    <button class="link linkd hidden" id="sheet-del">🗑 Delete</button>
+  </div>
   <div class="segs" id="segs">
     <button data-k="expense" class="on">🧾 Expense</button>
     <button data-k="loan">🤝 Loan</button>
@@ -377,7 +410,8 @@ window.FIREBASE_CONFIG = {
   const catIcon=c=>{const f=CATS.find(x=>x[0]===c);return f?f[1]:"🧾";};
 
   let state=load(), me=localStorage.getItem("monty.me")||"", filterMonth="all";
-  let entryKind="expense";
+  let entryKind="expense", editingId=null;
+  let fType="all", fWho="all", fCat="all", fSearch="";
   let personal=[];
   const CFG=window.FIREBASE_CONFIG||{};
   let cloudRef=null, personalRef=null, currentUser=null, seeding=false;
@@ -520,12 +554,14 @@ window.FIREBASE_CONFIG = {
     else{
       const rowFor=s=>{
         const f=mateById(s.from),t=mateById(s.to);
-        if(s.to===me){return `<div class="owe-row">${av(s.from,f&&f.name)}<div class="t"><div class="n">${esc(f&&f.name)}</div><div class="s">owes you</div></div><div class="amt pos">+${money(s.amt)}</div></div>`;}
-        if(s.from===me){return `<div class="owe-row">${av(s.to,t&&t.name)}<div class="t"><div class="n">${esc(t&&t.name)}</div><div class="s">you owe them</div></div><div class="amt neg">−${money(s.amt)}</div></div>`;}
-        return `<div class="owe-row">${av(s.from,f&&f.name)}<div class="t"><div class="n">${esc(f&&f.name)} → ${esc(t&&t.name)}</div><div class="s">settles up</div></div><div class="amt">${money(s.amt)}</div></div>`;
+        const data=`data-sf="${s.from}" data-st="${s.to}" data-sa="${s.amt}"`;
+        if(s.to===me){return `<div class="owe-row tapset" ${data}>${av(s.from,f&&f.name)}<div class="t"><div class="n">${esc(f&&f.name)}</div><div class="s">owes you · tap to settle</div></div><div class="amt pos">+${money(s.amt)}</div></div>`;}
+        if(s.from===me){return `<div class="owe-row tapset" ${data}>${av(s.to,t&&t.name)}<div class="t"><div class="n">${esc(t&&t.name)}</div><div class="s">you owe them · tap to settle</div></div><div class="amt neg">−${money(s.amt)}</div></div>`;}
+        return `<div class="owe-row tapset" ${data}>${av(s.from,f&&f.name)}<div class="t"><div class="n">${esc(f&&f.name)} → ${esc(t&&t.name)}</div><div class="s">settles up · tap to record</div></div><div class="amt">${money(s.amt)}</div></div>`;
       };
       oc.innerHTML=(mine.length?mine.map(rowFor).join(""):`<div class="owe-row"><div class="t muted" style="padding:2px">You're settled — nothing to pay or collect.</div></div>`)
-        +(other.length?`<div style="padding:10px 16px 4px" class="faint" style="font-size:12px">Between others</div>`+other.map(rowFor).join(""):"");
+        +(other.length?`<div class="faint" style="padding:10px 16px 4px;font-size:12px">Between others</div>`+other.map(rowFor).join(""):"");
+      oc.querySelectorAll(".tapset").forEach(el=>el.onclick=()=>openSettle(el.dataset.sf,el.dataset.st,parseFloat(el.dataset.sa)));
     }
     const nc=$("net-card");
     nc.innerHTML=state.mates.length?state.mates.map(m=>{
@@ -535,34 +571,74 @@ window.FIREBASE_CONFIG = {
     }).join(""):`<div class="empty">No flatmates yet.</div>`;
   }
 
+  /* ===== filters ===== */
+  const typeOf=t=>t.type==="expense"?"expense":(t.kind==="loan"?"loan":"payment");
+  function filtersActive(){return fType!=="all"||fWho!=="all"||fCat!=="all"||!!fSearch.trim();}
+  function filteredTxns(){
+    return inScope(state.txns).filter(t=>{
+      if(fType!=="all"&&typeOf(t)!==fType)return false;
+      if(fWho!=="all"&&!involves(t,fWho))return false;
+      if(fCat!=="all"&&(t.type!=="expense"||(t.cat||"General")!==fCat))return false;
+      if(fSearch.trim()){const hay=((t.desc||"")+" "+(t.cat||"")).toLowerCase();if(!hay.includes(fSearch.trim().toLowerCase()))return false;}
+      return true;
+    });
+  }
+  function buildFilters(){
+    const types=[["all","All types"],["expense","🧾 Expenses"],["loan","🤝 Loans"],["payment","💵 Payments"]];
+    $("f-type").innerHTML=types.map(t=>`<option value="${t[0]}">${t[1]}</option>`).join("");$("f-type").value=fType;
+    $("f-who").innerHTML=`<option value="all">Anyone</option>`+state.mates.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
+    if(fWho!=="all"&&!state.mates.some(m=>m.id===fWho))fWho="all";$("f-who").value=fWho;
+    const cats=[...new Set(state.txns.filter(t=>t.type==="expense").map(t=>t.cat||"General"))];
+    $("f-cat").innerHTML=`<option value="all">All categories</option>`+cats.map(c=>`<option value="${c}">${catIcon(c)} ${c}</option>`).join("");
+    if(fCat!=="all"&&!cats.includes(fCat))fCat="all";$("f-cat").value=fCat;
+    if(document.activeElement!==$("f-search"))$("f-search").value=fSearch;
+    $("f-clear").classList.toggle("hidden",!filtersActive());
+  }
+
   /* ===== render activity ===== */
   function renderActivity(){
-    const items=[...inScope(state.txns)].sort((a,b)=>(b.date+b.id).localeCompare(a.date+a.id));
-    const exp=inScope(state.txns).filter(t=>t.type!=="payment").reduce((s,e)=>s+e.amt,0);
-    const loans=inScope(state.txns).filter(t=>t.type==="payment"&&t.kind==="loan").reduce((s,e)=>s+e.amt,0);
+    buildFilters();
+    const fil=filteredTxns();
+    const items=[...fil].sort((a,b)=>(b.date+b.id).localeCompare(a.date+a.id));
+    const exp=fil.filter(t=>t.type!=="payment").reduce((s,e)=>s+e.amt,0);
+    const loans=fil.filter(t=>t.type==="payment"&&t.kind==="loan").reduce((s,e)=>s+e.amt,0);
     $("act-summary").innerHTML=`<div style="display:flex;text-align:center">
       <div style="flex:1"><div class="muted" style="font-size:12px;font-weight:600">Spent</div><div style="font-weight:800;font-size:18px">${money0(exp)}</div></div>
       <div style="flex:1;border-left:1px solid var(--line)"><div class="muted" style="font-size:12px;font-weight:600">Loans</div><div style="font-weight:800;font-size:18px;color:var(--loan)">${money0(loans)}</div></div>
       <div style="flex:1;border-left:1px solid var(--line)"><div class="muted" style="font-size:12px;font-weight:600">Entries</div><div style="font-weight:800;font-size:18px">${items.length}</div></div>
     </div>`;
+    // category breakdown
+    const byCat={};fil.filter(t=>t.type==="expense").forEach(t=>{const c=t.cat||"General";byCat[c]=(byCat[c]||0)+t.amt;});
+    const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);const maxC=cats.length?cats[0][1]:0;
+    const hasCat=cats.length>0;
+    $("cat-title").classList.toggle("hidden",!hasCat);$("cat-card").classList.toggle("hidden",!hasCat);
+    if(hasCat)$("cat-card").innerHTML=cats.map(([c,v])=>`<div class="catrow"><span class="ci">${catIcon(c)}</span>
+      <span class="cn">${esc(c)}</span><span class="bar"><i style="width:${Math.max(6,v/maxC*100)}%"></i></span>
+      <span class="cv">${money0(v)}</span></div>`).join("");
     const c=$("act-card");
-    if(!items.length){c.innerHTML=`<div class="empty"><span class="big">🧾</span>No entries ${filterMonth==="all"?"yet":"this month"}.<br>Tap + to add one.</div>`;return;}
+    if(!items.length){c.innerHTML=`<div class="empty"><span class="big">${filtersActive()?"🔍":"🧾"}</span>${filtersActive()?"No entries match your filters.":"No entries "+(filterMonth==="all"?"yet":"this month")+".<br>Tap + to add one."}</div>`;return;}
     c.innerHTML=items.map(t=>{
       if(t.type==="payment"){
         const f=mateById(t.from),to=mateById(t.to),loan=t.kind==="loan";
-        return `<div class="act"><div class="ic">${loan?"🤝":"💵"}</div>
+        return `<div class="act" data-edit="${t.id}"><div class="ic">${loan?"🤝":"💵"}</div>
           <div class="mid"><div class="n">${first(f&&f.name)} → ${first(to&&to.name)}<span class="pilltag ${loan?'loan':'pay'}">${loan?"LOAN":"PAYMENT"}</span></div>
           <div class="s">${esc(t.date)}${t.desc?" · "+esc(t.desc):""}</div></div>
           <div class="right"><div class="a ${loan?'loan':'pay'}">${money0(t.amt)}</div><div class="del" data-del="${t.id}">Delete</div></div></div>`;
       }
       const p=mateById(t.payer),sh=t.amt/(t.split||[]).length;
-      return `<div class="act"><div class="ic">${catIcon(t.cat)}</div>
+      return `<div class="act" data-edit="${t.id}"><div class="ic">${catIcon(t.cat)}</div>
         <div class="mid"><div class="n">${esc(t.desc)}</div>
         <div class="s">${first(p&&p.name)} paid · ${money0(sh)}/person · ${esc(t.date)}</div></div>
         <div class="right"><div class="a">${money0(t.amt)}</div><div class="del" data-del="${t.id}">Delete</div></div></div>`;
     }).join("");
-    c.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{if(confirm("Delete this entry?"))removeTxn(b.dataset.del);});
+    c.querySelectorAll("[data-edit]").forEach(el=>el.onclick=()=>openSheetEdit(el.dataset.edit));
+    c.querySelectorAll("[data-del]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();if(confirm("Delete this entry?"))removeTxn(b.dataset.del);});
   }
+  $("f-type").onchange=e=>{fType=e.target.value;renderActivity();};
+  $("f-who").onchange=e=>{fWho=e.target.value;renderActivity();};
+  $("f-cat").onchange=e=>{fCat=e.target.value;renderActivity();};
+  $("f-search").oninput=e=>{fSearch=e.target.value;renderActivity();};
+  $("f-clear").onclick=()=>{fType=fWho=fCat="all";fSearch="";renderActivity();};
 
   /* ===== render people ===== */
   function renderPeople(){
@@ -613,15 +689,32 @@ window.FIREBASE_CONFIG = {
   $("acct-btn").onclick=()=>document.querySelector('.nav a[data-go="personal"]').click();
 
   /* ===== sheet ===== */
-  function openSheet(){populateSheet();$("scrim").classList.add("show");$("sheet").classList.add("show");}
-  function closeSheet(){$("scrim").classList.remove("show");$("sheet").classList.remove("show");}
+  function setKind(k){entryKind=k;
+    document.querySelectorAll("#segs button").forEach(x=>x.classList.toggle("on",x.dataset.k===k));
+    $("sheet-title").textContent=(editingId?"Edit ":"Add ")+k;
+    ["expense","loan","payment"].forEach(x=>$("f-"+x).classList.toggle("hidden",x!==k));}
+  function openSheet(){editingId=null;$("segs").classList.remove("hidden");$("sheet-del").classList.add("hidden");
+    populateSheet();setKind(entryKind);$("scrim").classList.add("show");$("sheet").classList.add("show");}
+  function closeSheet(){$("scrim").classList.remove("show");$("sheet").classList.remove("show");
+    editingId=null;$("segs").classList.remove("hidden");$("sheet-del").classList.add("hidden");}
+  function updateTxn(t){const i=state.txns.findIndex(x=>x.id===t.id);if(i>=0)state.txns[i]=t;else state.txns.push(t);
+    saveLocal();renderAll();pushCloud("txns/"+t.id,t);}
+  function setSplit(arr){document.querySelectorAll("#e-split .chip").forEach(c=>{const on=arr.includes(c.dataset.id);
+    c.classList.toggle("on",on);c.querySelector(".ck").textContent=on?"✓":"";});}
+  function openSheetEdit(id){const t=state.txns.find(x=>x.id===id);if(!t)return;
+    editingId=id;$("segs").classList.add("hidden");$("sheet-del").classList.remove("hidden");
+    populateSheet();const k=typeOf(t);setKind(k);
+    if(k==="expense"){$("e-desc").value=t.desc||"";$("e-amt").value=t.amt;$("e-cat").value=t.cat||"General";fillSel($("e-payer"),t.payer);$("e-date").value=t.date||todayStr();setSplit(t.split||[]);eHint();}
+    else if(k==="loan"){fillSel($("l-from"),t.from);fillSel($("l-to"),t.to);$("l-amt").value=t.amt;$("l-date").value=t.date||todayStr();$("l-note").value=(t.desc==="Loan"?"":t.desc)||"";}
+    else{fillSel($("p-from"),t.from);fillSel($("p-to"),t.to);$("p-amt").value=t.amt;$("p-date").value=t.date||todayStr();$("p-note").value=t.desc||"";}
+    $("scrim").classList.add("show");$("sheet").classList.add("show");}
+  function openSettle(from,to,amt){openSheet();setKind("payment");
+    fillSel($("p-from"),from);fillSel($("p-to"),to);$("p-amt").value=Math.round(amt*100)/100;
+    $("p-note").value="Settle up";$("p-date").value=todayStr();}
   $("fab").onclick=()=>{if(state.mates.length<2){flash("Add 2+ flatmates first");document.querySelector('.nav a[data-go="group"]').click();return;}openSheet();};
   $("scrim").onclick=closeSheet;
-  document.querySelectorAll("#segs button").forEach(b=>b.onclick=()=>{
-    entryKind=b.dataset.k;document.querySelectorAll("#segs button").forEach(x=>x.classList.toggle("on",x===b));
-    $("sheet-title").textContent={expense:"Add expense",loan:"Add loan",payment:"Add payment"}[entryKind];
-    ["expense","loan","payment"].forEach(k=>$("f-"+k).classList.toggle("hidden",k!==entryKind));
-  });
+  $("sheet-del").onclick=()=>{if(editingId&&confirm("Delete this entry?")){removeTxn(editingId);closeSheet();flash("Deleted");}};
+  document.querySelectorAll("#segs button").forEach(b=>b.onclick=()=>setKind(b.dataset.k));
   function fillSel(sel,keep){const p=keep!==undefined?keep:sel.value;
     sel.innerHTML=state.mates.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
     if(state.mates.some(m=>m.id===p))sel.value=p;}
@@ -644,18 +737,18 @@ window.FIREBASE_CONFIG = {
     payer=$("e-payer").value,cat=$("e-cat").value,date=$("e-date").value||todayStr(),split=eSplit();
     if(!desc)return flash("Add a description");if(!(amt>0))return flash("Enter an amount");
     if(!split.length)return flash("Pick who splits it");
-    addTxn({id:uid(),type:"expense",desc,amt,payer,cat,date,split});
-    $("e-desc").value="";$("e-amt").value="";closeSheet();flash("Expense added ✓");};
+    const ed=!!editingId;(ed?updateTxn:addTxn)({id:editingId||uid(),type:"expense",desc,amt,payer,cat,date,split});
+    $("e-desc").value="";$("e-amt").value="";closeSheet();flash(ed?"Updated ✓":"Expense added ✓");};
   $("save-loan").onclick=()=>{const from=$("l-from").value,to=$("l-to").value,amt=parseFloat($("l-amt").value),
     date=$("l-date").value||todayStr(),note=$("l-note").value.trim();
     if(from===to)return flash("Lender and borrower differ");if(!(amt>0))return flash("Enter an amount");
-    addTxn({id:uid(),type:"payment",kind:"loan",from,to,amt,date,desc:note||"Loan"});
-    $("l-amt").value="";$("l-note").value="";closeSheet();flash("Loan added ✓");};
+    const ed=!!editingId;(ed?updateTxn:addTxn)({id:editingId||uid(),type:"payment",kind:"loan",from,to,amt,date,desc:note||"Loan"});
+    $("l-amt").value="";$("l-note").value="";closeSheet();flash(ed?"Updated ✓":"Loan added ✓");};
   $("save-payment").onclick=()=>{const from=$("p-from").value,to=$("p-to").value,amt=parseFloat($("p-amt").value),
     date=$("p-date").value||todayStr(),note=$("p-note").value.trim();
     if(from===to)return flash("From and To differ");if(!(amt>0))return flash("Enter an amount");
-    addTxn({id:uid(),type:"payment",kind:"settle",from,to,amt,date,desc:note});
-    $("p-amt").value="";$("p-note").value="";closeSheet();flash("Payment added ✓");};
+    const ed=!!editingId;(ed?updateTxn:addTxn)({id:editingId||uid(),type:"payment",kind:"settle",from,to,amt,date,desc:note});
+    $("p-amt").value="";$("p-note").value="";closeSheet();flash(ed?"Updated ✓":"Payment added ✓");};
 
   /* ===== personal sheet ===== */
   function openP(){$("pe-cat").innerHTML=CATS.map(c=>`<option value="${c[0]}">${c[1]} ${c[0]}</option>`).join("");
@@ -697,6 +790,17 @@ window.FIREBASE_CONFIG = {
     navigator.clipboard.writeText(link).then(()=>flash("Invite link copied ✓"),()=>prompt("Copy link:",link));};
   $("export").onclick=()=>{const b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
     const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="monty-"+room+".json";a.click();};
+  $("export-csv").onclick=()=>{
+    const nm=id=>{const m=mateById(id);return m?m.name:id||"";};
+    const cell=v=>{v=String(v==null?"":v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+    const rows=[["Date","Type","Description","Category","Amount","Currency","Paid by / From","To","Split between"]];
+    [...state.txns].sort((a,b)=>(a.date+a.id).localeCompare(b.date+b.id)).forEach(t=>{
+      if(t.type==="payment")rows.push([t.date,t.kind==="loan"?"Loan":"Payment",t.desc||"","",t.amt,state.currency,nm(t.from),nm(t.to),""]);
+      else rows.push([t.date,"Expense",t.desc,t.cat||"General",t.amt,state.currency,nm(t.payer),"",(t.split||[]).map(nm).join(" | ")]);
+    });
+    const csv=rows.map(r=>r.map(cell).join(",")).join("\n");
+    const b=new Blob([csv],{type:"text/csv"});const a=document.createElement("a");
+    a.href=URL.createObjectURL(b);a.download="monty-"+room+".csv";a.click();flash("CSV exported ✓");};
   $("import-btn").onclick=()=>$("import").click();
   $("import").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
     r.onload=()=>{try{let d=JSON.parse(r.result);if(!Array.isArray(d.mates))throw 0;
