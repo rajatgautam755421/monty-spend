@@ -293,12 +293,13 @@
 
     <div class="sec-title">Flatmates</div>
     <div class="card" id="mate-list" style="margin-bottom:12px"></div>
-    <div class="card pad">
+    <div class="card pad" id="add-mate-card">
       <div class="frow"><div><label>Name</label><input class="in" id="m-name" placeholder="Full name" /></div>
       <div><label>Phone / eSewa (optional)</label><input class="in" id="m-phone" inputmode="tel" placeholder="98XXXXXXXX" /></div></div>
       <div style="margin-top:10px"><label>Email (optional)</label><input class="in" id="m-email" type="email" placeholder="name@email.com" /></div>
       <button class="btn" style="margin-top:12px" id="add-mate">Add flatmate</button>
     </div>
+    <div class="card pad hidden" id="add-mate-note" style="color:var(--muted);font-size:13px;text-align:center">🔒 Only the group owner can add or remove flatmates. Tap a name to edit phone / eSewa QR.</div>
 
     <div class="sec-title">Settings</div>
     <div class="card">
@@ -688,8 +689,11 @@ window.FIREBASE_CONFIG = {
       :`<div class="empty">No flatmates yet. Add one below.</div>`;
     l.querySelectorAll("[data-contact]").forEach(el=>el.onclick=()=>openContact(el.dataset.contact));
     l.querySelectorAll("[data-rm]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();
+      if(!isOwner())return flash("Only the owner can remove flatmates");
       if(state.txns.some(t=>involves(t,b.dataset.rm))&&!confirm("This person is in some entries. Removing also deletes those. Continue?"))return;
       removeMate(b.dataset.rm);});
+    $("add-mate-card").classList.toggle("hidden",!isOwner());
+    $("add-mate-note").classList.toggle("hidden",isOwner());
     $("room-input").value=room;
   }
 
@@ -815,7 +819,8 @@ window.FIREBASE_CONFIG = {
 
   /* ===== people / me / currency ===== */
   $("me-sel").onchange=e=>{me=e.target.value;localStorage.setItem("monty.me",me);renderAll();};
-  $("add-mate").onclick=()=>{const name=$("m-name").value.trim(),email=$("m-email").value.trim(),phone=$("m-phone").value.trim();
+  $("add-mate").onclick=()=>{if(!isOwner())return flash("Only the owner can add flatmates");
+    const name=$("m-name").value.trim(),email=$("m-email").value.trim(),phone=$("m-phone").value.trim();
     if(!name)return flash("Enter a name");
     if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return flash("Invalid email");
     addMate({id:uid(),name,email,phone});$("m-name").value="";$("m-email").value="";$("m-phone").value="";flash("Flatmate added ✓");};
