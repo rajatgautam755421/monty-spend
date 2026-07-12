@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="Monty — a minimal shared-expense splitter for flatmates. Track who paid, cash transfers, and settle up per month or combined." />
+<meta name="description" content="Monty — a minimal shared-expense splitter for flatmates. Track who paid, cash transfers, and settle up. Live-synced across your flat." />
 <title>Monty · Split flatmate expenses</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%236c8cff'/%3E%3Ctext x='50' y='72' font-size='64' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E" />
 <style>
@@ -22,7 +22,7 @@
   }
   a{color:var(--accent)}
   .wrap{max-width:860px;margin:0 auto;padding:28px 18px 80px}
-  header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
   .brand{display:flex;align-items:center;gap:12px}
   .logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--accent),#9d7bff);
     display:grid;place-items:center;font-weight:800;color:#fff;font-size:20px;box-shadow:var(--shadow)}
@@ -30,6 +30,18 @@
   .brand p{margin:0;color:var(--muted);font-size:12.5px}
   select.cur{background:var(--panel-2);color:var(--text);border:1px solid var(--line);
     border-radius:10px;padding:8px 10px;font-size:14px}
+
+  .syncbar{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);
+    border-radius:11px;padding:9px 13px;margin-bottom:18px;font-size:12.5px;flex-wrap:wrap}
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .dot.on{background:var(--accent-2);box-shadow:0 0 0 3px rgba(74,222,128,.15)}
+  .dot.off{background:var(--muted)}
+  .dot.err{background:var(--danger)}
+  .syncbar .rc{font-weight:700;color:var(--text)}
+  .syncbar .grow{flex:1}
+  .syncbar button{border:none;background:var(--panel-2);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:6px 11px;font-weight:700;font-size:12px;cursor:pointer}
+  .syncbar button.primary{background:var(--accent);color:#fff;border-color:transparent}
 
   .tabs{display:flex;gap:6px;background:var(--panel);padding:6px;border-radius:12px;border:1px solid var(--line);margin-bottom:20px}
   .tab{flex:1;text-align:center;padding:10px;border-radius:9px;cursor:pointer;color:var(--muted);
@@ -86,8 +98,8 @@
   .chip{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:20px;
     background:var(--panel-2);border:1px solid var(--line);cursor:pointer;font-size:13px;user-select:none}
   .chip.on{border-color:var(--accent);background:rgba(108,140,255,.14);color:var(--text)}
-  .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--line)}
-  .chip.on .dot{background:var(--accent-2)}
+  .chip .dot2{width:8px;height:8px;border-radius:50%;background:var(--line)}
+  .chip.on .dot2{background:var(--accent-2)}
   .mini{font-size:12px;color:var(--accent);cursor:pointer;user-select:none;margin-left:4px}
 
   .exp{flex-direction:column;align-items:stretch;gap:6px}
@@ -111,6 +123,7 @@
   .totline{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);
     padding:10px 2px 0;border-top:1px solid var(--line);margin-top:12px}
   .totline b{color:var(--text);font-size:15px}
+  .note{color:var(--muted);font-size:12px;margin:12px 0 0}
   .hidden{display:none!important}
   @media(max-width:560px){.brand p{display:none}}
 </style>
@@ -127,6 +140,14 @@
     </div>
     <select class="cur" id="currency" title="Currency"></select>
   </header>
+
+  <div class="syncbar">
+    <span class="dot off" id="sync-dot"></span>
+    <span id="sync-text">Local only</span>
+    <span class="grow"></span>
+    <span>Group: <span class="rc" id="room-code">—</span></span>
+    <button class="primary" id="share-btn">Share invite</button>
+  </div>
 
   <nav class="tabs">
     <div class="tab active" data-tab="expenses">Ledger <span class="badge" id="badge-exp">0</span></div>
@@ -178,7 +199,7 @@
 
         <!-- PAYMENT FORM -->
         <div id="form-payment" class="hidden">
-          <p class="sub" style="color:var(--muted);font-size:12.5px;margin:0 0 12px">
+          <p class="note" style="margin-top:0">
             One flatmate handed cash to another (e.g. monthly contribution, paying back a loan).
           </p>
           <div class="row">
@@ -241,21 +262,57 @@
       <div class="list" id="mate-list"></div>
     </div>
     <div class="card">
-      <h2>Data</h2>
+      <h2>Sync &amp; sharing</h2>
+      <div id="sync-detail" class="note" style="margin-top:0"></div>
+      <div class="row" style="margin-top:12px">
+        <div style="flex:2"><label>Group code (everyone in the flat uses the same one)</label>
+          <input id="room-input" placeholder="e.g. mughal-house" /></div>
+        <div style="display:flex;align-items:flex-end"><button class="btn" id="join-room">Join / switch</button></div>
+      </div>
+      <div class="actions" style="justify-content:flex-start;margin-top:12px">
+        <button class="btn ghost sm" id="share-btn2">Copy invite link</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Backup</h2>
       <div class="row">
         <button class="btn ghost sm" id="export">Export JSON</button>
         <button class="btn ghost sm" id="import-btn">Import JSON</button>
         <input type="file" id="import" accept="application/json" class="hidden" />
-        <button class="btn danger sm" id="reset">Reset everything</button>
+        <button class="btn danger sm" id="reset">Reset this group</button>
       </div>
-      <p class="sub" style="color:var(--muted);font-size:12px;margin:12px 0 0">
-        Data is stored privately in this browser (localStorage). Export to back up or move devices.
-      </p>
     </div>
   </section>
 
   <div class="foot">Monty · minimal expense splitter</div>
 </div>
+
+<!-- Firebase SDK (loaded only when configured) -->
+<script>
+/* ============================================================
+   FIREBASE CONFIG
+   Paste the config from your Firebase project's web app here.
+   Until it's filled in, the app runs in private local-only mode.
+   ============================================================ */
+window.FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  databaseURL: "",
+  projectId: "",
+  appId: ""
+};
+</script>
+
+<!-- Firebase compat SDK: only fetched when a config is provided above -->
+<script>
+(function(){
+  if(!(window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey)) return;
+  const base="https://www.gstatic.com/firebasejs/10.12.2/";
+  ["firebase-app-compat.js","firebase-auth-compat.js","firebase-database-compat.js"].forEach(f=>{
+    document.write('<script src="'+base+f+'"><\/script>');
+  });
+})();
+</script>
 
 <script>
 (function(){
@@ -269,21 +326,29 @@
 
   let state = load();
   let entryType = "expense";
-  let filterMonth = "all"; // "all" or "YYYY-MM"
+  let filterMonth = "all";
+
+  // sync state
+  let cloudRef = null;         // firebase db ref to rooms/{room}, or null
+  let cloudReady = false;
+  let seeding = false;
+  const CFG = window.FIREBASE_CONFIG || {};
+  const urlRoom = new URLSearchParams(location.search).get("room");
+  let room = sanitizeRoom(urlRoom || localStorage.getItem("monty.room") || ("flat-"+Math.random().toString(36).slice(2,8)));
+  localStorage.setItem("monty.room", room);
+
+  function sanitizeRoom(s){ return String(s).toLowerCase().replace(/[^a-z0-9\-_]/g,"-").replace(/^-+|-+$/g,"").slice(0,40) || "flat"; }
 
   function load(){
     let s=null;
     try{ s=JSON.parse(localStorage.getItem(LS_KEY)); }catch(e){}
     if(!s || !Array.isArray(s.mates)) return { mates:[], txns:[], currency:"रू" };
-    // migrate old {expenses:[...]} format -> txns
-    if(!Array.isArray(s.txns)){
-      s.txns = (s.expenses||[]).map(e=>Object.assign({type:"expense"},e));
-    }
+    if(!Array.isArray(s.txns)) s.txns = (s.expenses||[]).map(e=>Object.assign({type:"expense"},e));
     delete s.expenses;
     if(!s.currency) s.currency="रू";
     return s;
   }
-  function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  function saveLocal(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
   const $ = id => document.getElementById(id);
   const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -293,27 +358,92 @@
   const mateById = id => state.mates.find(m=>m.id===id);
   const first = n => esc(n.split(/\s+/)[0]);
   const monthLabel = ym => MONTHS[+ym.slice(5,7)-1]+" "+ym.slice(0,4);
+  const involves = (t,id) => t.payer===id || t.from===id || t.to===id || (t.split||[]).includes(id);
 
-  // ---------- currency ----------
+  /* =============== CLOUD SYNC =============== */
+  function pushCloud(path,val){
+    if(!cloudRef) return;
+    try{ val===null ? cloudRef.child(path).remove() : cloudRef.child(path).set(val); }catch(e){}
+  }
+  function adoptCloud(v){
+    v=v||{};
+    state.mates = v.mates ? Object.values(v.mates).sort((a,b)=>String(a.id).localeCompare(String(b.id))) : [];
+    state.txns  = v.txns  ? Object.values(v.txns) : [];
+    if(v.meta && v.meta.currency) state.currency=v.meta.currency;
+    saveLocal(); renderAll();
+  }
+  function seedCloud(){
+    seeding=true;
+    const payload={ meta:{currency:state.currency}, mates:{}, txns:{} };
+    state.mates.forEach(m=>payload.mates[m.id]=m);
+    state.txns.forEach(t=>payload.txns[t.id]=t);
+    cloudRef.set(payload).finally(()=>{ seeding=false; });
+  }
+  function connectRoom(){
+    if(!window.firebase || !CFG.apiKey) return;
+    if(cloudRef){ cloudRef.off(); cloudRef=null; cloudReady=false; }
+    cloudRef = firebase.database().ref("rooms/"+room);
+    setSync("connecting");
+    cloudRef.once("value").then(snap=>{
+      const v=snap.val();
+      const empty = !v || ((!v.mates||!Object.keys(v.mates).length) && (!v.txns||!Object.keys(v.txns).length));
+      if(empty && (state.mates.length || state.txns.length)) seedCloud();  // seed room from my local data
+      else if(!empty) adoptCloud(v);
+      cloudReady=true;
+      setSync("on");
+      cloudRef.on("value", s=>{ if(!seeding) adoptCloud(s.val()); });
+    }).catch(err=>{ setSync("err", err && err.message); });
+  }
+  function initFirebase(){
+    if(!CFG.apiKey){ setSync("local"); return; }
+    if(!window.firebase){ setSync("err","Firebase SDK not loaded"); return; }
+    try{
+      firebase.initializeApp(CFG);
+      firebase.auth().signInAnonymously()
+        .then(connectRoom)
+        .catch(err=>setSync("err", err && err.message));
+    }catch(e){ setSync("err", e.message); }
+  }
+  function setSync(status,msg){
+    const dot=$("sync-dot"), txt=$("sync-text"), det=$("sync-detail");
+    dot.className="dot "+(status==="on"?"on":status==="err"?"err":"off");
+    const map={ on:"Live-synced", connecting:"Connecting…", local:"Local only (not shared)", err:"Sync error — running local" };
+    txt.textContent=map[status]||status;
+    if(det){
+      if(status==="on") det.innerHTML=`✓ Connected. Everyone who opens this app with group code <b>${esc(room)}</b> shares this ledger live.`;
+      else if(status==="local") det.innerHTML=`Not connected to the cloud, so data stays only in this browser. (Sync isn't configured yet.)`;
+      else if(status==="err") det.innerHTML=`Couldn't reach the cloud (${esc(msg||"")}). Working locally; changes will not sync.`;
+      else det.textContent="Connecting…";
+    }
+  }
+
+  /* =============== MUTATIONS =============== */
+  function addMate(m){ state.mates.push(m); saveLocal(); renderAll(); pushCloud("mates/"+m.id,m); }
+  function removeMateEverywhere(id){
+    const rmTx=state.txns.filter(t=>involves(t,id)).map(t=>t.id);
+    state.txns=state.txns.filter(t=>!involves(t,id));
+    state.mates=state.mates.filter(m=>m.id!==id);
+    saveLocal(); renderAll();
+    pushCloud("mates/"+id,null); rmTx.forEach(tid=>pushCloud("txns/"+tid,null));
+  }
+  function addTxn(t){ state.txns.push(t); saveLocal(); renderAll(); pushCloud("txns/"+t.id,t); }
+  function removeTxn(id){ state.txns=state.txns.filter(t=>t.id!==id); saveLocal(); renderAll(); pushCloud("txns/"+id,null); }
+  function setCurrency(c){ state.currency=c; saveLocal(); renderAll(); pushCloud("meta/currency",c); }
+
+  /* =============== UI WIRING =============== */
   const curSel = $("currency");
-  CURRENCIES.forEach(([sym,code])=>{
-    const o=document.createElement("option"); o.value=sym; o.textContent=sym+" "+code; curSel.appendChild(o);
-  });
+  CURRENCIES.forEach(([sym,code])=>{ const o=document.createElement("option"); o.value=sym; o.textContent=sym+" "+code; curSel.appendChild(o); });
   curSel.value = state.currency;
-  curSel.onchange = ()=>{ state.currency=curSel.value; save(); renderAll(); };
+  curSel.onchange = ()=> setCurrency(curSel.value);
 
-  // ---------- tabs ----------
   document.querySelectorAll(".tab").forEach(t=>{
     t.onclick=()=>{
       document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
       t.classList.add("active");
-      ["expenses","balances","mates"].forEach(name=>{
-        $("tab-"+name).classList.toggle("hidden", name!==t.dataset.tab);
-      });
+      ["expenses","balances","mates"].forEach(name=>$("tab-"+name).classList.toggle("hidden", name!==t.dataset.tab));
     };
   });
 
-  // ---------- entry type toggle ----------
   $("seg-expense").onclick=()=>setType("expense");
   $("seg-payment").onclick=()=>setType("payment");
   function setType(t){
@@ -325,71 +455,48 @@
     $("form-payment").classList.toggle("hidden",t!=="payment");
   }
 
-  // ---------- flatmates ----------
   $("add-mate").onclick = ()=>{
     const name=$("m-name").value.trim(), email=$("m-email").value.trim();
     if(!name){ $("m-name").focus(); return; }
     if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ alert("Please enter a valid email."); return; }
-    state.mates.push({id:uid(),name,email});
-    $("m-name").value=""; $("m-email").value="";
-    save(); renderAll(); $("m-name").focus();
+    addMate({id:uid(),name,email});
+    $("m-name").value=""; $("m-email").value=""; $("m-name").focus();
   };
-  function removeMate(id){
-    const used = state.txns.some(t=> t.payer===id || t.from===id || t.to===id || (t.split||[]).includes(id));
-    if(used && !confirm("This flatmate appears in ledger entries. Removing them will also delete those entries. Continue?")) return;
-    state.txns = state.txns.filter(t=> t.payer!==id && t.from!==id && t.to!==id && !(t.split||[]).includes(id));
-    state.mates = state.mates.filter(m=>m.id!==id);
-    save(); renderAll();
-  }
 
-  // ---------- add expense ----------
   function selectedSplit(){ return [...document.querySelectorAll("#e-split .chip.on")].map(c=>c.dataset.id); }
   $("split-all").onclick=()=>{ document.querySelectorAll("#e-split .chip").forEach(c=>c.classList.add("on")); updateSplitHint(); };
   $("split-none").onclick=()=>{ document.querySelectorAll("#e-split .chip").forEach(c=>c.classList.remove("on")); updateSplitHint(); };
   $("add-expense").onclick = ()=>{
-    const desc=$("e-desc").value.trim();
-    const amt=parseFloat($("e-amt").value);
-    const payer=$("e-payer").value;
-    const date=$("e-date").value || todayStr();
-    const split=selectedSplit();
+    const desc=$("e-desc").value.trim(), amt=parseFloat($("e-amt").value), payer=$("e-payer").value;
+    const date=$("e-date").value || todayStr(), split=selectedSplit();
     if(!desc){ $("e-desc").focus(); return; }
     if(!(amt>0)){ $("e-amt").focus(); return; }
     if(!payer){ alert("Select who paid."); return; }
-    if(split.length===0){ alert("Select at least one person to split between."); return; }
-    state.txns.push({id:uid(),type:"expense",desc,amt,payer,date,split});
-    $("e-desc").value=""; $("e-amt").value="";
-    save(); renderAll(); $("e-desc").focus();
+    if(!split.length){ alert("Select at least one person to split between."); return; }
+    addTxn({id:uid(),type:"expense",desc,amt,payer,date,split});
+    $("e-desc").value=""; $("e-amt").value=""; $("e-desc").focus();
   };
-
-  // ---------- add payment ----------
   $("add-payment").onclick = ()=>{
-    const from=$("p-from").value, to=$("p-to").value;
-    const amt=parseFloat($("p-amt").value);
-    const date=$("p-date").value || todayStr();
-    const note=$("p-note").value.trim();
+    const from=$("p-from").value, to=$("p-to").value, amt=parseFloat($("p-amt").value);
+    const date=$("p-date").value || todayStr(), note=$("p-note").value.trim();
     if(!from||!to){ alert("Select both people."); return; }
     if(from===to){ alert("From and To must be different people."); return; }
     if(!(amt>0)){ $("p-amt").focus(); return; }
-    state.txns.push({id:uid(),type:"payment",from,to,amt,date,desc:note});
+    addTxn({id:uid(),type:"payment",from,to,amt,date,desc:note});
     $("p-amt").value=""; $("p-note").value="";
-    save(); renderAll();
   };
-
-  function removeTxn(id){ state.txns=state.txns.filter(t=>t.id!==id); save(); renderAll(); }
   function todayStr(){ return new Date().toISOString().slice(0,10); }
 
-  // ---------- balances / settlement ----------
-  function txnsInScope(){
-    return filterMonth==="all" ? state.txns : state.txns.filter(t=>(t.date||"").slice(0,7)===filterMonth);
-  }
+  /* =============== BALANCES =============== */
+  function txnsInScope(){ return filterMonth==="all" ? state.txns : state.txns.filter(t=>(t.date||"").slice(0,7)===filterMonth); }
   function computeBalances(txns){
     const bal={}; state.mates.forEach(m=>bal[m.id]=0);
     txns.forEach(t=>{
       if(t.type==="payment"){
-        if(bal[t.from]!==undefined) bal[t.from]+=t.amt;   // giver is owed
-        if(bal[t.to]!==undefined)   bal[t.to]-=t.amt;     // receiver owes
+        if(bal[t.from]!==undefined) bal[t.from]+=t.amt;
+        if(bal[t.to]!==undefined)   bal[t.to]-=t.amt;
       }else{
-        const n=t.split.length; if(!n) return;
+        const n=(t.split||[]).length; if(!n) return;
         const share=t.amt/n;
         if(bal[t.payer]!==undefined) bal[t.payer]+=t.amt;
         t.split.forEach(id=>{ if(bal[id]!==undefined) bal[id]-=share; });
@@ -398,14 +505,12 @@
     return bal;
   }
   function settlements(bal){
-    const cred=[], debt=[];
-    Object.keys(bal).forEach(id=>{
-      const v=Math.round(bal[id]*100)/100;
-      if(v>0.005) cred.push({id,v}); else if(v<-0.005) debt.push({id,v:-v});
-    });
+    const cred=[],debt=[];
+    Object.keys(bal).forEach(id=>{const v=Math.round(bal[id]*100)/100;
+      if(v>0.005)cred.push({id,v});else if(v<-0.005)debt.push({id,v:-v});});
     cred.sort((a,b)=>b.v-a.v); debt.sort((a,b)=>b.v-a.v);
     const out=[]; let i=0,j=0;
-    while(i<debt.length && j<cred.length){
+    while(i<debt.length&&j<cred.length){
       const pay=Math.min(debt[i].v,cred[j].v);
       out.push({from:debt[i].id,to:cred[j].id,amt:pay});
       debt[i].v-=pay; cred[j].v-=pay;
@@ -413,41 +518,33 @@
     }
     return out;
   }
-
-  // ---------- month filters ----------
-  function availableMonths(){
-    return [...new Set(state.txns.map(t=>(t.date||"").slice(0,7)).filter(Boolean))].sort().reverse();
-  }
+  function availableMonths(){ return [...new Set(state.txns.map(t=>(t.date||"").slice(0,7)).filter(Boolean))].sort().reverse(); }
   function buildMonthSelect(sel){
     const months=availableMonths();
-    sel.innerHTML = `<option value="all">All time (combined)</option>` +
-      months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join("");
+    sel.innerHTML = `<option value="all">All time (combined)</option>`+months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join("");
     if(filterMonth!=="all" && !months.includes(filterMonth)) filterMonth="all";
     sel.value=filterMonth;
   }
   function onMonthChange(e){ filterMonth=e.target.value; renderAll(); }
-  $("month-hist").onchange=onMonthChange;
-  $("month-bal").onchange=onMonthChange;
+  $("month-hist").onchange=onMonthChange; $("month-bal").onchange=onMonthChange;
 
-  // ---------- render ----------
+  /* =============== RENDER =============== */
   function avatar(m){ return `<div class="avatar" style="background:${colorFor(m.id)}">${esc(initials(m.name))}</div>`; }
-
   function renderMates(){
     $("badge-mates").textContent = state.mates.length;
     const list=$("mate-list");
     if(!state.mates.length){ list.innerHTML=`<div class="empty">No flatmates yet. Add one above.</div>`; return; }
     list.innerHTML = state.mates.map(m=>`
-      <div class="item">
-        ${avatar(m)}
-        <div class="meta">
-          <div class="n">${esc(m.name)}</div>
-          <div class="e">${m.email?esc(m.email):"<span style='opacity:.6'>no email</span>"}</div>
-        </div>
-        <button class="btn danger sm" data-rm="${m.id}">Remove</button>
-      </div>`).join("");
-    list.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>removeMate(b.dataset.rm));
+      <div class="item">${avatar(m)}
+        <div class="meta"><div class="n">${esc(m.name)}</div>
+          <div class="e">${m.email?esc(m.email):"<span style='opacity:.6'>no email</span>"}</div></div>
+        <button class="btn danger sm" data-rm="${m.id}">Remove</button></div>`).join("");
+    list.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{
+      const used=state.txns.some(t=>involves(t,b.dataset.rm));
+      if(used && !confirm("This flatmate appears in ledger entries. Removing them also deletes those entries. Continue?")) return;
+      removeMateEverywhere(b.dataset.rm);
+    });
   }
-
   function fillPeople(sel,keep){
     const prev=keep!==undefined?keep:sel.value;
     sel.innerHTML = state.mates.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
@@ -460,22 +557,17 @@
     if(!ok) return;
     fillPeople($("e-payer"));
     fillPeople($("p-from"));
-    fillPeople($("p-to"), state.mates[1] && $("p-to").value ? $("p-to").value : (state.mates[1]||{}).id);
-    // split chips
+    fillPeople($("p-to"), ($("p-to").value && state.mates.some(m=>m.id===$("p-to").value))?$("p-to").value:(state.mates[1]||{}).id);
     const split=$("e-split");
     const onIds = split.querySelector(".chip") ? selectedSplit() : state.mates.map(m=>m.id);
-    split.innerHTML = state.mates.map(m=>{
-      const on = onIds.includes(m.id);
-      return `<div class="chip ${on?'on':''}" data-id="${m.id}"><span class="dot"></span>${esc(m.name)}</div>`;
-    }).join("");
+    split.innerHTML = state.mates.map(m=>`<div class="chip ${onIds.includes(m.id)?'on':''}" data-id="${m.id}"><span class="dot2"></span>${esc(m.name)}</div>`).join("");
     split.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{ c.classList.toggle("on"); updateSplitHint(); });
     if(!$("e-date").value) $("e-date").value=todayStr();
     if(!$("p-date").value) $("p-date").value=todayStr();
     updateSplitHint();
   }
   function updateSplitHint(){
-    const n=selectedSplit().length;
-    const amt=parseFloat($("e-amt").value);
+    const n=selectedSplit().length, amt=parseFloat($("e-amt").value);
     let t = n?`· ${n} ${n===1?'person':'people'}`:"· select people";
     if(n && amt>0) t += ` · ${money(amt/n)} each`;
     $("split-hint").textContent=t;
@@ -495,30 +587,20 @@
     list.innerHTML = items.map(t=>{
       if(t.type==="payment"){
         const f=mateById(t.from), to=mateById(t.to);
-        return `<div class="item exp">
-          <div class="head">
-            ${f?avatar(f):""}
-            <div class="desc">${esc(f?f.name:"?")} <span style="color:var(--muted)">→</span> ${esc(to?to.name:"?")}
-              <span class="pill pay">cash</span></div>
+        return `<div class="item exp"><div class="head">${f?avatar(f):""}
+            <div class="desc">${esc(f?f.name:"?")} <span style="color:var(--muted)">→</span> ${esc(to?to.name:"?")} <span class="pill pay">cash</span></div>
             <div class="amt" style="color:var(--pay)">${money(t.amt)}</div>
-            <button class="btn danger sm" data-rmx="${t.id}">✕</button>
-          </div>
-          <div class="sub">${esc(t.date)}${t.desc?" · "+esc(t.desc):" · cash transfer"}</div>
-        </div>`;
+            <button class="btn danger sm" data-rmx="${t.id}">✕</button></div>
+          <div class="sub">${esc(t.date)}${t.desc?" · "+esc(t.desc):" · cash transfer"}</div></div>`;
       }
-      const payer=mateById(t.payer);
-      const share=t.amt/t.split.length;
+      const payer=mateById(t.payer), share=t.amt/t.split.length;
       const names=t.split.map(id=>{const m=mateById(id);return m?first(m.name):"?";}).join(", ");
-      return `<div class="item exp">
-        <div class="head">
-          ${payer?avatar(payer):""}
+      return `<div class="item exp"><div class="head">${payer?avatar(payer):""}
           <div class="desc">${esc(t.desc)} <span class="pill exp">expense</span></div>
           <div class="amt">${money(t.amt)}</div>
-          <button class="btn danger sm" data-rmx="${t.id}">✕</button>
-        </div>
+          <button class="btn danger sm" data-rmx="${t.id}">✕</button></div>
         <div class="sub">${payer?esc(payer.name):"?"} paid · ${esc(t.date)}</div>
-        <div class="breakdown">Split ${t.split.length} ways → <b>${money(share)}</b> each &nbsp;·&nbsp; ${names}</div>
-      </div>`;
+        <div class="breakdown">Split ${t.split.length} ways → <b>${money(share)}</b> each &nbsp;·&nbsp; ${names}</div></div>`;
     }).join("");
     list.querySelectorAll("[data-rmx]").forEach(b=>b.onclick=()=>removeTxn(b.dataset.rmx));
     const exp=txnsInScope().filter(t=>t.type!=="payment").reduce((s,e)=>s+e.amt,0);
@@ -527,51 +609,54 @@
     $("tot-amt").textContent=money(exp);
     $("tot-line").classList.remove("hidden");
   }
-
   function renderBalances(){
     buildMonthSelect($("month-bal"));
-    const txns=txnsInScope();
-    const bal=computeBalances(txns);
+    const bal=computeBalances(txnsInScope());
     const setl=settlements(bal);
     const sl=$("settle-list");
     if(state.mates.length<2){ sl.innerHTML=`<div class="empty">Add flatmates and entries to see settlements.</div>`; }
     else if(!setl.length){ sl.innerHTML=`<div class="allsettled">✓ All settled up — nobody owes anything${filterMonth==="all"?"":" this month"}.</div>`; }
-    else{
-      sl.innerHTML=setl.map(s=>{
-        const f=mateById(s.from),t=mateById(s.to);
-        return `<div class="settle">
-          ${f?avatar(f):""}
-          <span class="who">${esc(f?f.name:"?")}</span>
-          <span class="arrow">→ pays →</span>
-          <span class="who">${esc(t?t.name:"?")}</span>
-          <span class="amt">${money(s.amt)}</span>
-        </div>`;
-      }).join("");
-    }
+    else sl.innerHTML=setl.map(s=>{
+      const f=mateById(s.from),t=mateById(s.to);
+      return `<div class="settle">${f?avatar(f):""}<span class="who">${esc(f?f.name:"?")}</span>
+        <span class="arrow">→ pays →</span><span class="who">${esc(t?t.name:"?")}</span>
+        <span class="amt">${money(s.amt)}</span></div>`;
+    }).join("");
     const bl=$("balance-list");
     if(!state.mates.length){ bl.innerHTML=`<div class="empty">No flatmates yet.</div>`; return; }
     bl.innerHTML=state.mates.map(m=>{
       const v=Math.round((bal[m.id]||0)*100)/100;
       const cls=v>0.005?"pos":v<-0.005?"neg":"";
       const label=v>0.005?"gets back":v<-0.005?"owes / lent out":"settled";
-      return `<div class="item bal">
-        ${avatar(m)}
+      return `<div class="item bal">${avatar(m)}
         <div class="meta"><div class="n">${esc(m.name)}</div><div class="e">${label}</div></div>
-        <div class="amt ${cls}">${v===0?money(0):money(Math.abs(v))}</div>
-      </div>`;
+        <div class="amt ${cls}">${v===0?money(0):money(Math.abs(v))}</div></div>`;
     }).join("");
   }
+  function renderRoom(){ $("room-code").textContent=room; if($("room-input")) $("room-input").value=room; }
+  function renderAll(){ curSel.value=state.currency; renderRoom(); renderMates(); renderEntryForm(); renderHistory(); renderBalances(); }
 
-  function renderAll(){
-    curSel.value=state.currency;
-    renderMates(); renderEntryForm(); renderHistory(); renderBalances();
+  /* =============== ROOM / SHARE / DATA =============== */
+  function inviteLink(){ return location.origin+location.pathname+"?room="+encodeURIComponent(room); }
+  function share(){
+    const link=inviteLink();
+    const text=`Join our flat expenses on Monty (group: ${room}):\n${link}`;
+    if(navigator.share){ navigator.share({title:"Monty expenses",text:"Join our flat expenses",url:link}).catch(()=>{}); return; }
+    navigator.clipboard.writeText(link).then(()=>alert("Invite link copied:\n"+link),()=>prompt("Copy this invite link:",link));
   }
+  $("share-btn").onclick=share; $("share-btn2").onclick=share;
+  $("join-room").onclick=()=>{
+    const v=sanitizeRoom($("room-input").value);
+    if(!v){ return; }
+    room=v; localStorage.setItem("monty.room",room);
+    if(cloudRef){ connectRoom(); } // re-subscribe to the new room
+    renderRoom();
+    alert("Group set to: "+room+(cloudRef?"\nNow live-synced with everyone using this code.":""));
+  };
 
-  // ---------- data tools ----------
   $("export").onclick=()=>{
     const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
-    const a=document.createElement("a");
-    a.href=URL.createObjectURL(blob); a.download="monty-data.json"; a.click();
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="monty-"+room+".json"; a.click();
   };
   $("import-btn").onclick=()=>$("import").click();
   $("import").onchange=e=>{
@@ -581,16 +666,20 @@
       let d=JSON.parse(r.result);
       if(!Array.isArray(d.mates)) throw 0;
       if(!Array.isArray(d.txns)) d.txns=(d.expenses||[]).map(x=>Object.assign({type:"expense"},x));
-      delete d.expenses;
-      state=Object.assign({currency:"रू"},d); save(); renderAll(); alert("Imported.");
+      state={mates:d.mates,txns:d.txns,currency:d.currency||"रू"};
+      saveLocal(); renderAll();
+      if(cloudRef) seedCloud();
+      alert("Imported"+(cloudRef?" and pushed to the group.":"."));
     }catch(_){ alert("Invalid file."); } };
     r.readAsText(f); e.target.value="";
   };
-  $("reset").onclick=()=>{ if(confirm("Delete all flatmates and ledger entries? This cannot be undone.")){
-    state={mates:[],txns:[],currency:state.currency}; filterMonth="all"; save(); renderAll();
+  $("reset").onclick=()=>{ if(confirm("Delete all flatmates and ledger entries for this group? This cannot be undone.")){
+    state={mates:[],txns:[],currency:state.currency}; filterMonth="all"; saveLocal(); renderAll();
+    if(cloudRef) cloudRef.set({meta:{currency:state.currency}});
   }};
 
   renderAll();
+  initFirebase();
 })();
 </script>
 </body>
