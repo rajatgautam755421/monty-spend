@@ -76,6 +76,18 @@
   .catrow .cv{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;flex:0 0 auto;min-width:74px;text-align:right}
   .act{cursor:pointer}
   .owe-row.tapset{cursor:pointer}
+  .prow{cursor:pointer}
+  .prow .ph{font-size:12px;color:var(--pay);font-weight:600}
+  .qrmini{width:34px;height:34px;border-radius:8px;flex:0 0 auto;background:var(--bg);display:grid;place-items:center;font-size:16px}
+  .qrbox{text-align:center;margin:4px 0 16px}
+  .qrbox img{width:210px;height:210px;border-radius:14px;background:#fff;padding:8px;box-shadow:var(--sh-1)}
+  .qrbox .nm{font-weight:800;font-size:16px;margin-top:10px}
+  .qrbox .pn{font-size:14px;color:var(--pay);font-weight:700;margin-top:2px}
+  .qrbox .none{color:var(--faint);padding:30px;font-size:13.5px}
+  .payqr{display:flex;align-items:center;gap:12px;background:var(--pay-bg);border-radius:13px;padding:10px 12px;margin-bottom:13px}
+  .payqr img{width:64px;height:64px;border-radius:10px;background:#fff;padding:4px;flex:0 0 auto}
+  .payqr .t{flex:1;min-width:0}.payqr .t .a{font-weight:700;font-size:13.5px}.payqr .t .b{font-size:12.5px;color:var(--pay);font-weight:700}
+  .payqr .big{width:64px;height:64px;border-radius:10px;background:#fff;display:grid;place-items:center;font-size:26px}
 
   /* hero */
   .hero{background:linear-gradient(135deg,#6366f1,#7c74ff);color:#fff;border-radius:22px;padding:22px 20px;
@@ -283,7 +295,8 @@
     <div class="card" id="mate-list" style="margin-bottom:12px"></div>
     <div class="card pad">
       <div class="frow"><div><label>Name</label><input class="in" id="m-name" placeholder="Full name" /></div>
-      <div><label>Email (optional)</label><input class="in" id="m-email" type="email" placeholder="name@email.com" /></div></div>
+      <div><label>Phone / eSewa (optional)</label><input class="in" id="m-phone" inputmode="tel" placeholder="98XXXXXXXX" /></div></div>
+      <div style="margin-top:10px"><label>Email (optional)</label><input class="in" id="m-email" type="email" placeholder="name@email.com" /></div>
       <button class="btn" style="margin-top:12px" id="add-mate">Add flatmate</button>
     </div>
 
@@ -356,6 +369,7 @@
     <p class="hint" style="margin:0 0 12px">A flatmate paid money back or gave their contribution.</p>
     <div class="frow field"><div><label>From (paid)</label><select class="in" id="p-from"></select></div>
       <div><label>To (received)</label><select class="in" id="p-to"></select></div></div>
+    <div id="pay-qr" class="payqr hidden"></div>
     <div class="frow field"><div><label>Amount</label><input class="in" id="p-amt" type="number" inputmode="decimal" placeholder="0" /></div>
       <div><label>Date</label><input class="in" id="p-date" type="date" /></div></div>
     <div class="field"><label>Note (optional)</label><input class="in" id="p-note" placeholder="e.g. July contribution" /></div>
@@ -373,6 +387,18 @@
     <div><label>Category</label><select class="in" id="pe-cat"></select></div></div>
   <div class="field"><label>Date</label><input class="in" id="pe-date" type="date" /></div>
   <button class="btn" id="save-personal">Add</button>
+</div>
+
+<!-- contact / eSewa sheet -->
+<div class="scrim" id="scrim-c"></div>
+<div class="sheet" id="sheet-c">
+  <div class="grab"></div>
+  <h3 id="c-title">Contact & eSewa</h3>
+  <div class="qrbox" id="c-qrbox"></div>
+  <div class="field"><label>Phone / eSewa ID</label><input class="in" id="c-phone" inputmode="tel" placeholder="98XXXXXXXX" /></div>
+  <div class="field"><label>eSewa QR image link (optional)</label><input class="in" id="c-qrlink" placeholder="Paste your eSewa 'Share QR' image URL" />
+    <div class="hint">Leave blank to auto-make a QR from the number.</div></div>
+  <button class="btn" id="c-save">Save contact</button>
 </div>
 
 <div class="flash" id="flash"></div>
@@ -442,6 +468,7 @@ window.FIREBASE_CONFIG = {
   function isOwner(){return !!(currentUser&&currentUser.email&&currentUser.email.toLowerCase()===OWNER_EMAIL);}
   const delBtn=id=>isOwner()?`<div class="del" data-del="${id}">Delete</div>`:"";
   const av=(id,name,size)=>`<div class="av" style="background:${colorFor(id)}${size?';width:'+size+'px;height:'+size+'px;font-size:'+(size/2.7)+'px':''}">${esc(initials(name))}</div>`;
+  const qrSrc=m=>m&&m.qr?m.qr:(m&&m.phone?"https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data="+encodeURIComponent(m.phone):"");
   function flash(msg){const f=$("flash");f.textContent=msg;f.classList.add("show");clearTimeout(f._t);f._t=setTimeout(()=>f.classList.remove("show"),1800);}
 
   /* ===== cloud ===== */
@@ -498,6 +525,7 @@ window.FIREBASE_CONFIG = {
 
   /* ===== mutations ===== */
   function addMate(m){state.mates.push(m);saveLocal();renderAll();pushCloud("mates/"+m.id,m);}
+  function updateMate(m){const i=state.mates.findIndex(x=>x.id===m.id);if(i>=0)state.mates[i]=m;saveLocal();renderAll();pushCloud("mates/"+m.id,m);}
   function removeMate(id){const rm=state.txns.filter(t=>involves(t,id)).map(t=>t.id);
     state.txns=state.txns.filter(t=>!involves(t,id));state.mates=state.mates.filter(m=>m.id!==id);
     if(me===id){me="";localStorage.removeItem("monty.me");}
@@ -646,11 +674,13 @@ window.FIREBASE_CONFIG = {
   /* ===== render people ===== */
   function renderPeople(){
     const l=$("mate-list");
-    l.innerHTML=state.mates.length?state.mates.map(m=>`<div class="prow">${av(m.id,m.name)}
-      <div class="t"><div class="n">${esc(m.name)}</div><div class="e">${m.email?esc(m.email):"no email"}</div></div>
+    l.innerHTML=state.mates.length?state.mates.map(m=>`<div class="prow" data-contact="${m.id}">${av(m.id,m.name)}
+      <div class="t"><div class="n">${esc(m.name)}</div><div class="e">${m.phone?`<span class="ph">📱 ${esc(m.phone)}</span>`:(m.email?esc(m.email):"tap to add phone / eSewa QR")}</div></div>
+      <div class="qrmini">${qrSrc(m)?"📱":"＋"}</div>
       ${isOwner()?`<button class="link linkd" data-rm="${m.id}">Remove</button>`:""}</div>`).join("")
       :`<div class="empty">No flatmates yet. Add one below.</div>`;
-    l.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{
+    l.querySelectorAll("[data-contact]").forEach(el=>el.onclick=()=>openContact(el.dataset.contact));
+    l.querySelectorAll("[data-rm]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();
       if(state.txns.some(t=>involves(t,b.dataset.rm))&&!confirm("This person is in some entries. Removing also deletes those. Continue?"))return;
       removeMate(b.dataset.rm);});
     $("room-input").value=room;
@@ -695,7 +725,8 @@ window.FIREBASE_CONFIG = {
   function setKind(k){entryKind=k;
     document.querySelectorAll("#segs button").forEach(x=>x.classList.toggle("on",x.dataset.k===k));
     $("sheet-title").textContent=(editingId?"Edit ":"Add ")+k;
-    ["expense","loan","payment"].forEach(x=>$("f-"+x).classList.toggle("hidden",x!==k));}
+    ["expense","loan","payment"].forEach(x=>$("f-"+x).classList.toggle("hidden",x!==k));
+    if(k==="payment")renderPayQR();}
   function openSheet(){editingId=null;$("segs").classList.remove("hidden");$("sheet-del").classList.add("hidden");
     populateSheet();setKind(entryKind);$("scrim").classList.add("show");$("sheet").classList.add("show");}
   function closeSheet(){$("scrim").classList.remove("show");$("sheet").classList.remove("show");
@@ -713,7 +744,7 @@ window.FIREBASE_CONFIG = {
     $("scrim").classList.add("show");$("sheet").classList.add("show");}
   function openSettle(from,to,amt){openSheet();setKind("payment");
     fillSel($("p-from"),from);fillSel($("p-to"),to);$("p-amt").value=Math.round(amt*100)/100;
-    $("p-note").value="Settle up";$("p-date").value=todayStr();}
+    $("p-note").value="Settle up";$("p-date").value=todayStr();renderPayQR();}
   $("fab").onclick=()=>{if(state.mates.length<2){flash("Add 2+ flatmates first");document.querySelector('.nav a[data-go="group"]').click();return;}openSheet();};
   $("scrim").onclick=closeSheet;
   $("sheet-del").onclick=()=>{if(editingId&&confirm("Delete this entry?")){removeTxn(editingId);closeSheet();flash("Deleted");}};
@@ -777,10 +808,32 @@ window.FIREBASE_CONFIG = {
 
   /* ===== people / me / currency ===== */
   $("me-sel").onchange=e=>{me=e.target.value;localStorage.setItem("monty.me",me);renderAll();};
-  $("add-mate").onclick=()=>{const name=$("m-name").value.trim(),email=$("m-email").value.trim();
+  $("add-mate").onclick=()=>{const name=$("m-name").value.trim(),email=$("m-email").value.trim(),phone=$("m-phone").value.trim();
     if(!name)return flash("Enter a name");
     if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return flash("Invalid email");
-    addMate({id:uid(),name,email});$("m-name").value="";$("m-email").value="";flash("Flatmate added ✓");};
+    addMate({id:uid(),name,email,phone});$("m-name").value="";$("m-email").value="";$("m-phone").value="";flash("Flatmate added ✓");};
+
+  /* ===== contact / eSewa QR ===== */
+  let contactId=null;
+  function renderContactQR(m){const src=qrSrc(m);
+    $("c-qrbox").innerHTML=src?`<img src="${src}" alt="QR" referrerpolicy="no-referrer"/><div class="nm">${esc(m.name||"")}</div>${m.phone?`<div class="pn">eSewa · ${esc(m.phone)}</div>`:""}`
+      :`<div class="none">No phone or QR yet — add below and save to generate one.</div>`;}
+  function openContact(id){const m=mateById(id);if(!m)return;contactId=id;
+    $("c-title").textContent=m.name;renderContactQR(m);
+    $("c-phone").value=m.phone||"";$("c-qrlink").value=m.qr||"";
+    $("scrim-c").classList.add("show");$("sheet-c").classList.add("show");}
+  function closeContact(){$("scrim-c").classList.remove("show");$("sheet-c").classList.remove("show");contactId=null;}
+  $("scrim-c").onclick=closeContact;
+  ["c-phone","c-qrlink"].forEach(id=>$(id).oninput=()=>renderContactQR({name:$("c-title").textContent,phone:$("c-phone").value.trim(),qr:$("c-qrlink").value.trim()}));
+  $("c-save").onclick=()=>{if(!contactId)return;const m=Object.assign({},mateById(contactId));
+    m.phone=$("c-phone").value.trim();m.qr=$("c-qrlink").value.trim();
+    updateMate(m);renderContactQR(m);flash("Contact saved ✓");};
+  function renderPayQR(){const to=mateById($("p-to").value),src=qrSrc(to),box=$("pay-qr");
+    if(to&&(src||to.phone)){box.classList.remove("hidden");
+      box.innerHTML=(src?`<img src="${src}" referrerpolicy="no-referrer"/>`:`<div class="big">📱</div>`)
+        +`<div class="t"><div class="a">Pay ${esc(to.name)} via eSewa</div><div class="b">${to.phone?esc(to.phone):"scan the QR"}</div></div>`;
+    }else{box.classList.add("hidden");box.innerHTML="";}}
+  $("p-to").addEventListener("change",renderPayQR);
   const cur=$("currency");CURRENCIES.forEach(([s,c])=>{const o=document.createElement("option");o.value=s;o.textContent=s+" "+c;cur.appendChild(o);});
   cur.value=state.currency;cur.onchange=()=>setCurrency(cur.value);
 
