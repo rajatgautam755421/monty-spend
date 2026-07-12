@@ -498,7 +498,7 @@ window.FIREBASE_CONFIG = {
   let state=load(), me=localStorage.getItem("monty.me")||"", filterMonth="all";
   let entryKind="expense", editingId=null;
   let fType="all", fWho="all", fCat="all", fSearch="";
-  const ACT_PAGE=6; let actShown=ACT_PAGE, actObserver=null;
+  const ACT_PAGE=25; let actShown=ACT_PAGE, actObserver=null;
   function actReset(){actShown=ACT_PAGE;}
   let personal=[];
   const CFG=window.FIREBASE_CONFIG||{};
