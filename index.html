@@ -438,6 +438,9 @@ window.FIREBASE_CONFIG = {
   const first=n=>esc((n||"?").split(/\s+/)[0]);
   const todayStr=()=>new Date().toISOString().slice(0,10);
   const involves=(t,id)=>t.payer===id||t.from===id||t.to===id||(t.split||[]).includes(id);
+  const OWNER_EMAIL="gautamrajat185@gmail.com";
+  function isOwner(){return !!(currentUser&&currentUser.email&&currentUser.email.toLowerCase()===OWNER_EMAIL);}
+  const delBtn=id=>isOwner()?`<div class="del" data-del="${id}">Delete</div>`:"";
   const av=(id,name,size)=>`<div class="av" style="background:${colorFor(id)}${size?';width:'+size+'px;height:'+size+'px;font-size:'+(size/2.7)+'px':''}">${esc(initials(name))}</div>`;
   function flash(msg){const f=$("flash");f.textContent=msg;f.classList.add("show");clearTimeout(f._t);f._t=setTimeout(()=>f.classList.remove("show"),1800);}
 
@@ -471,7 +474,7 @@ window.FIREBASE_CONFIG = {
       firebase.auth().onAuthStateChanged(user=>{
         currentUser=user;
         if(!user){firebase.auth().signInAnonymously().catch(e=>setSync("err",e.message));return;}
-        connectRoom();connectPersonal(user);renderAccount();
+        connectRoom();connectPersonal(user);renderAll();
       });
     }catch(e){setSync("err",e.message);}
   }
@@ -623,13 +626,13 @@ window.FIREBASE_CONFIG = {
         return `<div class="act" data-edit="${t.id}"><div class="ic">${loan?"🤝":"💵"}</div>
           <div class="mid"><div class="n">${first(f&&f.name)} → ${first(to&&to.name)}<span class="pilltag ${loan?'loan':'pay'}">${loan?"LOAN":"PAYMENT"}</span></div>
           <div class="s">${esc(t.date)}${t.desc?" · "+esc(t.desc):""}</div></div>
-          <div class="right"><div class="a ${loan?'loan':'pay'}">${money0(t.amt)}</div><div class="del" data-del="${t.id}">Delete</div></div></div>`;
+          <div class="right"><div class="a ${loan?'loan':'pay'}">${money0(t.amt)}</div>${delBtn(t.id)}</div></div>`;
       }
       const p=mateById(t.payer),sh=t.amt/(t.split||[]).length;
       return `<div class="act" data-edit="${t.id}"><div class="ic">${catIcon(t.cat)}</div>
         <div class="mid"><div class="n">${esc(t.desc)}</div>
         <div class="s">${first(p&&p.name)} paid · ${money0(sh)}/person · ${esc(t.date)}</div></div>
-        <div class="right"><div class="a">${money0(t.amt)}</div><div class="del" data-del="${t.id}">Delete</div></div></div>`;
+        <div class="right"><div class="a">${money0(t.amt)}</div>${delBtn(t.id)}</div></div>`;
     }).join("");
     c.querySelectorAll("[data-edit]").forEach(el=>el.onclick=()=>openSheetEdit(el.dataset.edit));
     c.querySelectorAll("[data-del]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();if(confirm("Delete this entry?"))removeTxn(b.dataset.del);});
@@ -645,7 +648,7 @@ window.FIREBASE_CONFIG = {
     const l=$("mate-list");
     l.innerHTML=state.mates.length?state.mates.map(m=>`<div class="prow">${av(m.id,m.name)}
       <div class="t"><div class="n">${esc(m.name)}</div><div class="e">${m.email?esc(m.email):"no email"}</div></div>
-      <button class="link linkd" data-rm="${m.id}">Remove</button></div>`).join("")
+      ${isOwner()?`<button class="link linkd" data-rm="${m.id}">Remove</button>`:""}</div>`).join("")
       :`<div class="empty">No flatmates yet. Add one below.</div>`;
     l.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{
       if(state.txns.some(t=>involves(t,b.dataset.rm))&&!confirm("This person is in some entries. Removing also deletes those. Continue?"))return;
@@ -702,7 +705,7 @@ window.FIREBASE_CONFIG = {
   function setSplit(arr){document.querySelectorAll("#e-split .chip").forEach(c=>{const on=arr.includes(c.dataset.id);
     c.classList.toggle("on",on);c.querySelector(".ck").textContent=on?"✓":"";});}
   function openSheetEdit(id){const t=state.txns.find(x=>x.id===id);if(!t)return;
-    editingId=id;$("segs").classList.add("hidden");$("sheet-del").classList.remove("hidden");
+    editingId=id;$("segs").classList.add("hidden");$("sheet-del").classList.toggle("hidden",!isOwner());
     populateSheet();const k=typeOf(t);setKind(k);
     if(k==="expense"){$("e-desc").value=t.desc||"";$("e-amt").value=t.amt;$("e-cat").value=t.cat||"General";fillSel($("e-payer"),t.payer);$("e-date").value=t.date||todayStr();setSplit(t.split||[]);eHint();}
     else if(k==="loan"){fillSel($("l-from"),t.from);fillSel($("l-to"),t.to);$("l-amt").value=t.amt;$("l-date").value=t.date||todayStr();$("l-note").value=(t.desc==="Loan"?"":t.desc)||"";}
@@ -808,7 +811,8 @@ window.FIREBASE_CONFIG = {
       state={mates:d.mates,txns:d.txns,currency:d.currency||"रू"};saveLocal();renderAll();
       if(cloudRef)seedCloud();flash("Imported ✓");}catch(_){flash("Invalid file");}};
     r.readAsText(f);e.target.value="";};
-  $("reset").onclick=()=>{if(confirm("Delete everything in this group?")){
+  $("reset").onclick=()=>{if(!isOwner())return flash("Only the owner (your Gmail) can reset");
+    if(confirm("Delete everything in this group?")){
     state={mates:[],txns:[],currency:state.currency};filterMonth="all";saveLocal();renderAll();
     if(cloudRef)cloudRef.set({meta:{currency:state.currency}});}};
 
