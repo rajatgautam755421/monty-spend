@@ -97,6 +97,16 @@
   .actend{text-align:center;color:var(--faint);font-size:12px;padding:14px}
   .spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
+  /* splash / loading screen */
+  #splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:radial-gradient(1100px 600px at 50% 32%,#7c74ff,#6366f1);color:#fff;transition:opacity .45s ease}
+  #splash.hide{opacity:0;pointer-events:none}
+  #splash .s-logo{width:88px;height:88px;border-radius:24px;background:rgba(255,255,255,.18);display:grid;place-items:center;
+    font-weight:800;font-size:52px;box-shadow:0 12px 34px rgba(31,29,90,.35);animation:pop .5s cubic-bezier(.2,.9,.3,1.4)}
+  #splash .s-name{font-size:22px;font-weight:800;letter-spacing:.4px}
+  #splash .s-tag{font-size:13px;opacity:.85;margin-top:-8px}
+  #splash .s-spin{width:26px;height:26px;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;margin-top:8px}
+  @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
   .prow .ph{font-size:12px;color:var(--pay);font-weight:600}
   .qrmini{width:34px;height:34px;border-radius:8px;flex:0 0 auto;background:var(--bg);display:grid;place-items:center;font-size:16px}
   .pic-edit{display:flex;align-items:center;gap:14px;margin:4px 0 16px}
@@ -223,6 +233,13 @@
 </style>
 </head>
 <body>
+
+<div id="splash">
+  <div class="s-logo">M</div>
+  <div class="s-name">Monty</div>
+  <div class="s-tag">Flat expenses, sorted</div>
+  <div class="s-spin"></div>
+</div>
 
 <div class="app-head">
   <div class="inner">
@@ -1081,6 +1098,16 @@ window.FIREBASE_CONFIG = {
 </script>
 
 <script>
+/* ===== splash / loading screen ===== */
+(function(){
+  const sp=document.getElementById("splash");if(!sp)return;
+  const start=Date.now();
+  function hide(){const wait=Math.max(0,650-(Date.now()-start));
+    setTimeout(()=>{sp.classList.add("hide");setTimeout(()=>sp.remove(),500);},wait);}
+  if(document.readyState==="complete")hide();
+  else window.addEventListener("load",hide);
+  setTimeout(hide,4000); // safety fallback
+})();
 /* ===== PWA: service worker + install button ===== */
 (function(){
   if("serviceWorker" in navigator){
